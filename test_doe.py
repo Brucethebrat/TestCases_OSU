@@ -215,30 +215,32 @@ def generate_scenario11_full(seed=42):
     tails = []
     for i in range(num_tails):
         chosen_type = random.choice(allowed_tailtypes)["AircraftTypeName"]
+        tail_number = str(1000000 + i)
         tails.append({
-            "TailNumber": str(1000000 + i),
+            "TailNumber": tail_number,
             "AircraftTypeName": chosen_type,
-            "OriginalAircraftTypeName": chosen_type,
+            # "OriginalAircraftTypeName": chosen_type,
             "AvailableTime": "2025-03-31T01:48:00Z",
             "CurrentLocation": random.choice(airports),
-            "BeginTimeForNextMaintenanceAfterPlanningHorizon": "2026-04-01T09:26:48Z",
+            # "BeginTimeForNextMaintenanceAfterPlanningHorizon": "2026-04-01T09:26:48Z",
             "AssignedProperties": [
-                str(1000000 + i), chosen_type, "ELT_406MHZ_FLAG", "TCAS7.1", "NO_DOUBLE_BUNK"
+                tail_number, chosen_type
+                # str(1000000 + i), chosen_type, "ELT_406MHZ_FLAG", "TCAS7.1", "NO_DOUBLE_BUNK"
             ],
             "MinutesLeftForNextMaintenance": random.randint(200, 400),
             "CyclesLeftForNextMaintenance": random.randint(20, 40),
-            "UseAdditionalRouteTime": False,
-            "IsVendor": False,
-            "AutoPilotInoperative": False,
+            # "UseAdditionalRouteTime": False,
+            # "IsVendor": False,
+            # "AutoPilotInoperative": False,
             "TailCost": 6304,
-            "TailBaseAirport": "KCMH",
-            "TailLegCost": 1173,
-            "ServiceRequested": True,
-            "TailCostForFerry": 6304,
-            "TailCostForNonFerry": 6304,
-            "tailId": 1000000 + i,
-            "paxSeats": random.choice([8, 10, 12]),
-            "lavSeats": random.choice([0, 1]),
+            # "TailBaseAirport": "KCMH",
+            "TailLegCost": 1173
+            # "ServiceRequested": True,
+            # "TailCostForFerry": 6304,
+            # "TailCostForNonFerry": 6304,
+            # "tailId": 1000000 + i,
+            # "paxSeats": random.choice([8, 10, 12]),
+            # "lavSeats": random.choice([0, 1]),
         })
 
     # === generate flight requests ===
@@ -282,7 +284,7 @@ def generate_scenario11_full(seed=42):
     if crew_included:
         crews = generate_crewmembers(crewmember_level, allowed_tailtypes, us_airports, start_time, time_window_days)
         crew_activities = generate_crew_activities(crews, us_airports, start_time, time_window_days)
-        
+
     # ====================== Bruce ======================
 
 
