@@ -119,11 +119,14 @@ def generate_crewmembers(crewmember_level, allowed_tailtypes, us_airports, start
         # Start time is randomly set within the time window minus the roster length
         tour_start_time = start_time + timedelta(hours=random.randint(-roster_length * 24, time_window_days * 24))
         tour_end_time = tour_start_time + timedelta(minutes=roster_length * 24 * 60 + 13 * 60 - 1)      # add 13 hours because found schedule_sanitized crew pattern
+        airport_domicile = random.choice(us_airports)
+        current_loc = current_loc if random.random() < 0.9 else random.choice(us_airports)
         qualified_types = generate_allowed_tailtypes(allowed_tailtypes)
+
         crews.append({
             "CrewmemberID": crew_id,
-            "CurrentLocation": random.choice(us_airports),      # base airport
-            "AirportIDDomicile": random.choice(us_airports),    # base airport
+            "CurrentLocation": current_loc,
+            "AirportIDDomicile": airport_domicile,    # base airport
             "tourStartDate": tour_start_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
             "tourEndDate": tour_end_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
             "QualifiedAircraftTypes": qualified_types
