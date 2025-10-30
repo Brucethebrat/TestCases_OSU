@@ -43,6 +43,7 @@ def compute_weather_shutdown_airports(epicenter_icao: str, radius_miles: float,
             affected.add(icao)
     return affected
 
+# ====season factor====
 
 def build_grounding_legs_for_tails(tails: list, affected_airports: set,
                                    start_time_dt, time_window_days: int,
