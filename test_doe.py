@@ -3,6 +3,7 @@ import random
 from datetime import datetime, timedelta
 from collections import Counter
 from math import radians, sin, cos, sqrt, atan2
+import time
 
 # === Step 1. read in all airports latitude and longtitude ===
 with open("srd.json", "r", encoding="utf-8") as f:
@@ -158,7 +159,7 @@ def generate_crew_activities(crews, us_airports, start_time, time_window_days):
 
 def generate_scenario11_full(seed=42):
     #random.seed(seed)
-    random.seed()
+    random.seed(time.time())
 
     # === DOE factors ===
     arrival_rate = "low"      # requests = high: tails * 4 / low: tails * 2
@@ -273,6 +274,7 @@ def generate_scenario11_full(seed=42):
             ],
             "AllowedTailTypes": allowed_types,
             "requestedAircraftTypeName": jet_type,
+            "TailRequiredProperties": []
         }
         requests.append(req)
         base_dep_counter[dep] += 1
@@ -388,3 +390,8 @@ def generate_scenario11_full(seed=42):
 # === Generate Scenario 11 JSON ===
 scenario11 = generate_scenario11_full()
 
+# ======================= Vivian Read this ========================
+# # === Generate multiple scenarios based on DOE factors ===
+# exps = [{f1:"low",f2:0,f3:"low",f4:"high",f5:1,f6:1}, {f1:"high",f2:1,f3:"low",f4:"high",f5:1,f6:1}, ]
+# for exp in exps:
+#     generate_scenario11_full(exp.values())
