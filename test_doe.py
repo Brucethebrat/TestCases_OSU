@@ -22,6 +22,7 @@ geo_centers = {
     "KIAD": (38.9472, -77.4597)
 }
 
+# distance function between 2 coordinates on sphere
 def haversine(lat1, lon1, lat2, lon2):
     """return the distance of 2 cooridnates"""
     R = 3958.8  # earth radius (miles)
@@ -76,6 +77,84 @@ def build_grounding_legs_for_tails(tails: list, affected_airports: set,
     return legs
 
 
+# ====================== Bruce ======================
+def generate_allowed_tailtypes(allowed_tailtypes):
+    rand_allowed_tailtypes = []
+    temp_types = random.sample(allowed_tailtypes, k=random.randint(1, min(len(allowed_tailtypes), 4)))
+    for t in temp_types:
+        rand_allowed_tailtypes.append({
+            "AircraftTypeName": t["AircraftTypeName"],
+            "QualificationCode": "PIC",
+            "dayCurrencyExpiration": "2026-06-19T23:59:00Z",
+            "nightCurrencyExpiration": "2026-06-19T23:59:00Z",
+            "qualificationStartDate": "1900-01-01T00:00:00Z"
+        })
+        rand_allowed_tailtypes.append({
+            "AircraftTypeName": t["AircraftTypeName"],
+            "QualificationCode": "SIC",
+            "qualificationStartDate": "1900-01-01T00:00:00Z"
+        })
+    return rand_allowed_tailtypes
+
+
+# ====================== Bruce ======================
+def generate_crewmembers(crewmember_level, allowed_tailtypes, us_airports, start_time, time_window_days):
+    crews = []
+    # positions = ["PIC", "SIC"]
+    if crewmember_level == "low":
+        num_crews = 1500
+    elif crewmember_level == "mid":
+        num_crews = 2000
+    elif crewmember_level == "high":
+        num_crews = 2500
+    else:
+        print("Invalid crewmember_level, defaulting to low (2000 crews)")
+        num_crews = 2000
+    
+    for cid in range(1, num_crews + 1):
+        crew_id = 700000 + cid
+        roster_length = random.randint(5,8) # days
+        # Start time is randomly set within the time window minus the roster length
+        tour_start_time = start_time + timedelta(hours=random.randint(-roster_length * 24, time_window_days * 24))
+        tour_end_time = tour_start_time + timedelta(minutes=roster_length * 24 * 60 + 13 * 60 - 1)      # add 13 hours because found schedule_sanitized crew pattern
+        qualified_types = generate_allowed_tailtypes(allowed_tailtypes)
+        crews.append({
+            "CrewmemberID": crew_id,
+            "CurrentLocation": random.choice(us_airports),      # base airport
+            "AirportIDDomicile": random.choice(us_airports),    # base airport
+            "tourStartDate": tour_start_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "tourEndDate": tour_end_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "QualifiedAircraftTypes": qualified_types
+        })
+    return crews
+
+
+# ====================== Bruce ======================
+def generate_crew_activities(crews, us_airports, start_time, time_window_days):
+    crew_activities = []
+    activity_types = ["MOVEMENT", "REST", "OPERATE_REVENUE_FLIGHT", "OPERATE_FERRY_FLIGHT", "STATIC_STANDBY"]  # Example activity type codes
+    for crew in crews:
+        if random.random() < 0.9:
+            continue  # 20% chance to skip adding activities for this crew
+        crew_id = crew["CrewmemberID"]
+        # num_activities = random.randint(3, 6)  # Number of activities per crew
+        # for _ in range(num_activities):
+        #     # activity_type = random.choice(activity_types)
+        activity_type = "REST"  # For simplicity, set all activities to REST
+        rest_airport = random.choice(us_airports)
+        activity_start = start_time + timedelta(minutes=random.randint(0, time_window_days * 24 * 60 - 60))
+        duration = random.randint(30, 300)
+        crew_activities.append({
+            "CrewmemberID": crew_id,
+            "ActivityType": activity_type,
+            "OriginAirport": rest_airport,
+            "DestinationAirport": rest_airport,
+            "StartTime": activity_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "Duration": duration,
+        })
+    return crew_activities
+
+
 def generate_scenario11_full(seed=42):
     #random.seed(seed)
     random.seed()
@@ -89,6 +168,12 @@ def generate_scenario11_full(seed=42):
     weather = True            # weather issue
     event = True              # event (superbowl...)
     start_time = datetime(2025, 4, 1, 6, 0, 0)
+    
+    # ====================== Bruce ======================
+    crew_included = True
+    crewmember_level = "low"      # low / mid / high = 1500 / 2000 / 2500 crews
+    # ====================== Bruce ======================
+
 
     # === numerical setting ===
     scale_map = {"low": 500, "high": 1000}
@@ -189,6 +274,16 @@ def generate_scenario11_full(seed=42):
         requests.append(req)
         base_dep_counter[dep] += 1
 
+    
+    # ====================== Bruce ======================
+
+    # === generate crew members if crew_included ===
+    if crew_included:
+        crews = generate_crewmembers(crewmember_level, allowed_tailtypes, us_airports, start_time, time_window_days)
+        crew_activities = generate_crew_activities(crews, us_airports, start_time, time_window_days)
+    # ====================== Bruce ======================
+
+
     # ===== Event factor =====
     baseline_count = len(requests)
 
@@ -257,15 +352,27 @@ def generate_scenario11_full(seed=42):
         "FlightRequests": requests + extra_requests,
         # only when weather=True add Legs
         **({"Legs": legs} if weather else {}),
+        **({"Crewmembers": crews} if crew_included else {}),    # ====================== Bruce ======================
+        **({"CrewActivities": crew_activities} if crew_included else {}),    # ====================== Bruce ======================
         "Weather": {
             "Enabled": weather,
             "Epicenter": epicenter if weather else None,
             "AffectedAirports": sorted(list(affected_airports)) if weather else [],
         },
+        
+        # ====================== Bruce ======================
+        "Configuration": {
+            "PlanningHorizon": {
+                "BeginTime": (start_time + timedelta(days=-1)).strftime("%Y-%m-%dT%H:%M:%SZ"),  # positioning start 1 day before
+                "EndTime": (start_time + timedelta(days=time_window_days)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            }
+        },
+        # ====================== Bruce ======================
+        
         "Description": "DOE Run #11 with Weather disruption",
     }
 
-    with open("scenario11_full.json", "w") as f:
+    with open("scenario11_full_with_crew.json", "w") as f:
         json.dump(scenario, f, indent=2)
 
     print(f"✅ scenario11_full.json generated ({len(legs)} weather legs)" if weather else "✅ scenario11_full.json generated (no weather)")
