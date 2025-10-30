@@ -281,6 +281,7 @@ def generate_scenario11_full(seed=42):
     if crew_included:
         crews = generate_crewmembers(crewmember_level, allowed_tailtypes, us_airports, start_time, time_window_days)
         crew_activities = generate_crew_activities(crews, us_airports, start_time, time_window_days)
+        
     # ====================== Bruce ======================
 
 
