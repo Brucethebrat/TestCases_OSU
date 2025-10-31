@@ -120,7 +120,7 @@ def generate_crewmembers(crewmember_level, allowed_tailtypes, us_airports, start
         tour_start_time = start_time + timedelta(hours=random.randint(-roster_length * 24, time_window_days * 24))
         tour_end_time = tour_start_time + timedelta(minutes=roster_length * 24 * 60 + 13 * 60 - 1)      # add 13 hours because found schedule_sanitized crew pattern
         airport_domicile = random.choice(us_airports)
-        current_loc = current_loc if random.random() < 0.9 else random.choice(us_airports)
+        current_loc = airport_domicile if random.random() < 0.9 else random.choice(us_airports)
         qualified_types = generate_allowed_tailtypes(allowed_tailtypes)
 
         crews.append({
@@ -160,30 +160,56 @@ def generate_crew_activities(crews, us_airports, start_time, time_window_days):
     return crew_activities
 
 
-def generate_scenario11_full(seed=42):
-    #random.seed(seed)
-    random.seed(time.time())
 
-    # === DOE factors ===
-    arrival_rate = "low"      # requests = high: tails * 4 / low: tails * 2
-    substitutes = 0           # 0 fleet types allowed
-    scale = "low"             # 500 planes
-    geo_density = "high"       # high = dense / low = dispersed
-    time_window_days = 1
-    weather = True            # weather issue
-    event = True              # event (superbowl...)
-    start_time = datetime(2025, 4, 1, 6, 0, 0)
+
+# === DOE factors ===
+def generate_scenario(
+    arrival_rate="low",
+    substitutes=0,
+    scale="low",
+    geo_density="low",
+    time_window_days=1,
+    weather=False,
+    event=False,
+    maintenance_cycle="low",
+    start_time=datetime(2025, 4, 1, 6, 0, 0),
+):
     
+    random.seed(time.time())   
     # ====================== Bruce ======================
     crew_included = True
     crewmember_level = "low"      # low / mid / high = 1500 / 2000 / 2500 crews
     # ====================== Bruce ======================
 
+    # === derive season from time window ===
+    month = start_time.month
+    if month in [12, 1, 2]:
+        season = "winter"
+    elif month in [3, 4, 5]:
+        season = "spring"
+    elif month in [6, 7, 8]:
+        season = "summer"
+    else:
+        season = "fall"
+
+    # === seasonal demand bias ===
+    if season in ["winter", "fall"]:
+        prob_north = 0.4
+        prob_south = 0.6
+    else:  # spring/summer
+        prob_north = 0.6
+        prob_south = 0.4
+
+    print(f"🍂 Auto season={season} (month={month}): demand North:{prob_north:.1f} South:{prob_south:.1f}")
 
     # === numerical setting ===
     scale_map = {"low": 500, "high": 1000}
     num_tails = scale_map[scale]
     num_requests = num_tails * (2 if arrival_rate == "low" else 4) * time_window_days
+
+    # === classify airports into north/south (based on latitude 37°N) ===
+    north_airports = [icao for icao, (lat, lon) in airport_coords.items() if lat > 37]
+    south_airports = [icao for icao, (lat, lon) in airport_coords.items() if lat <= 37]
 
     # === Step 3. select airports based on geo_density ===
     if geo_density == "high":
@@ -214,6 +240,13 @@ def generate_scenario11_full(seed=42):
         {"AircraftTypeName": "GL7500", "Penalty": 0},
         {"AircraftTypeName": "GL5500", "Penalty": 0},
     ]
+    # === set maintenance parameters based on DOE factor ===
+    if maintenance_cycle == "low":
+        min_left_range = (200, 400)
+        cycle_left_range = (20, 40)
+    else:
+        min_left_range = (800, 1200)
+        cycle_left_range = (60, 80)
 
     # === generate tails ===
     tails = []
@@ -231,8 +264,8 @@ def generate_scenario11_full(seed=42):
                 tail_number, chosen_type
                 # str(1000000 + i), chosen_type, "ELT_406MHZ_FLAG", "TCAS7.1", "NO_DOUBLE_BUNK"
             ],
-            "MinutesLeftForNextMaintenance": random.randint(200, 400),
-            "CyclesLeftForNextMaintenance": random.randint(20, 40),
+            "MinutesLeftForNextMaintenance": random.randint(*min_left_range),
+            "CyclesLeftForNextMaintenance": random.randint(*cycle_left_range),  
             # "UseAdditionalRouteTime": False,
             # "IsVendor": False,
             # "AutoPilotInoperative": False,
@@ -252,7 +285,17 @@ def generate_scenario11_full(seed=42):
     base_dep_counter = Counter() 
     for rid in range(1, num_requests + 1):
         dep = random.choice(airports)
-        arr = random.choice([a for a in airports if a != dep])
+        # === choose arrival airport with seasonal bias ===
+        if random.random() < prob_north and north_airports:
+            candidate_pool = [a for a in north_airports if a in airports and a != dep]
+        else:
+            candidate_pool = [a for a in south_airports if a in airports and a != dep]
+
+        if not candidate_pool:
+            candidate_pool = [a for a in airports if a != dep]
+
+        arr = random.choice(candidate_pool)
+
         req_time = start_time + timedelta(minutes=random.randint(0, time_window_days * 24 * 60))
         req_id = 50000 + rid
         jet_type = random.choice(allowed_tailtypes)["AircraftTypeName"]
@@ -295,13 +338,13 @@ def generate_scenario11_full(seed=42):
 
     # ===== Event factor =====
     baseline_count = len(requests)
-
+    extra_requests = []
     if event:
         epicenter_event = random.choice(us_airports)
         event_airports = compute_weather_shutdown_airports(epicenter_event, 30.0, airport_coords)
         print(f"🎪 Event at {epicenter_event}: {len(event_airports)} airports within 30mi have surge demand")
 
-        extra_requests = []
+        # extra_requests = []
         for ea in event_airports:
         # each airport generates 10 times requests
             for j in range(10):
@@ -354,6 +397,21 @@ def generate_scenario11_full(seed=42):
         weather_legs = []
 
 
+    # === save scenario ===
+    scenario = {
+        "DOE_Factors": {
+            "arrival_rate": arrival_rate,
+            "substitutes": substitutes,
+            "scale": scale,
+            "geo_density": geo_density,
+            "time_window_days": time_window_days,
+            "weather": weather,
+            "event": event,
+            "maintenance_cycle": maintenance_cycle,
+        },
+        "Tails": tails,
+        "FlightRequests": requests,
+    }
 
     # === Scenario output ===
     scenario = {
@@ -381,20 +439,28 @@ def generate_scenario11_full(seed=42):
         "Description": "DOE Run #11 with Weather disruption",
     }
 
-    with open("scenario11_full_with_crew.json", "w") as f:
+    filename = f"scenario_{arrival_rate}_{geo_density}_{scale}_{maintenance_cycle}.json"
+    with open(filename, "w") as f:
         json.dump(scenario, f, indent=2)
+    print(f"✅ {filename} generated with {num_requests} requests and {num_tails} tails")
 
-    print(f"✅ scenario11_full.json generated ({len(legs)} weather legs)" if weather else "✅ scenario11_full.json generated (no weather)")
-    return scenario
 
 
 
 
 # === Generate Scenario 11 JSON ===
-scenario11 = generate_scenario11_full()
+# scenario11 = generate_scenario11_full()
 
 # ======================= Vivian Read this ========================
 # # === Generate multiple scenarios based on DOE factors ===
 # exps = [{f1:"low",f2:0,f3:"low",f4:"high",f5:1,f6:1}, {f1:"high",f2:1,f3:"low",f4:"high",f5:1,f6:1}, ]
 # for exp in exps:
 #     generate_scenario11_full(exp.values())
+# === Generate multiple scenarios ===
+experiments = [
+    {"arrival_rate": "low", "substitutes": 0, "scale": "low", "geo_density": "high", "time_window_days": 1, "weather": True, "event": False, "maintenance_cycle": "low"},
+    {"arrival_rate": "high", "substitutes": 1, "scale": "high", "geo_density": "low", "time_window_days": 1, "weather": False, "event": True, "maintenance_cycle": "high"},
+]
+
+for exp in experiments:
+    generate_scenario(**exp)
