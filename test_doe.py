@@ -173,6 +173,7 @@ def generate_scenario(
     event=False,
     maintenance_cycle="low",
     start_time=datetime(2025, 4, 1, 6, 0, 0),
+    season="Winter"     # input season is more intuitive
 ):
     
     random.seed(time.time())   
@@ -181,6 +182,8 @@ def generate_scenario(
     crewmember_level = "low"      # low / mid / high = 1500 / 2000 / 2500 crews
     # ====================== Bruce ======================
 
+
+    # ========== Bruce: don't need this once we have season input ==========
     # === derive season from time window ===
     month = start_time.month
     if month in [12, 1, 2]:
@@ -191,14 +194,16 @@ def generate_scenario(
         season = "summer"
     else:
         season = "fall"
+    # ========== Bruce: don't need this once we have season input ==========
+
 
     # === seasonal demand bias ===
     if season in ["winter", "fall"]:
-        prob_north = 0.4
-        prob_south = 0.6
+        # prob_north = 0.4
+        prob_south = 0.3
     else:  # spring/summer
-        prob_north = 0.6
-        prob_south = 0.4
+        prob_north = 0.3
+        # prob_south = 0.4
 
     print(f"🍂 Auto season={season} (month={month}): demand North:{prob_north:.1f} South:{prob_south:.1f}")
 
@@ -218,6 +223,7 @@ def generate_scenario(
             for icao, (alat, alon) in airport_coords.items():
                 if haversine(clat, clon, alat, alon) <= 50:
                     nearby_airports.add(icao)
+        # ======= Bruce : this is weird, airports are too dense =======
         airports = list(nearby_airports)
         print(f"🌍 High density: {len(airports)} airports within 50 miles of 3 hubs")
     else:
@@ -240,6 +246,7 @@ def generate_scenario(
         {"AircraftTypeName": "GL7500", "Penalty": 0},
         {"AircraftTypeName": "GL5500", "Penalty": 0},
     ]
+    
     # === set maintenance parameters based on DOE factor ===
     if maintenance_cycle == "low":
         min_left_range = (200, 400)
@@ -286,10 +293,16 @@ def generate_scenario(
     for rid in range(1, num_requests + 1):
         dep = random.choice(airports)
         # === choose arrival airport with seasonal bias ===
-        if random.random() < prob_north and north_airports:
-            candidate_pool = [a for a in north_airports if a in airports and a != dep]
-        else:
-            candidate_pool = [a for a in south_airports if a in airports and a != dep]
+        if season in ["winter", "fall"]:
+            if random.random() < prob_south and south_airports:
+                candidate_pool = [a for a in north_airports if a in airports and a != dep]
+            else:
+                candidate_pool = [a for a in airports if a != dep]
+        elif season in ["spring", "summer"]:
+            if random.random() < prob_north and north_airports:
+                candidate_pool = [a for a in south_airports if a in airports and a != dep]
+            else:
+                candidate_pool = [a for a in airports if a != dep]
 
         if not candidate_pool:
             candidate_pool = [a for a in airports if a != dep]
