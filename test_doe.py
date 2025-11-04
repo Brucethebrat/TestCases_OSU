@@ -198,14 +198,19 @@ def generate_scenario(
 
 
     # === seasonal demand bias ===
-    if season in ["winter", "fall"]:
-        # prob_north = 0.4
-        prob_south = 0.3
-    else:  # spring/summer
-        prob_north = 0.3
-        # prob_south = 0.4
+    prob_bias = 0.3  # 30% flights biased toward seasonal direction
 
-    print(f"🍂 Auto season={season} (month={month}): demand North:{prob_north:.1f} South:{prob_south:.1f}")
+    if season in ["winter", "fall"]:
+        # 30% more flights go south, others random
+        prob_south_bias = prob_bias
+        bias_direction = "south"
+    else:  # spring/summer
+        # 30% more flights go north, others random
+        prob_south_bias = 1 - prob_bias
+        bias_direction = "north"
+
+    print(f"🍂 Auto season={season} (month={month}): 30% bias toward {bias_direction}")
+
 
     # === numerical setting ===
     scale_map = {"low": 500, "high": 1000}
@@ -294,18 +299,16 @@ def generate_scenario(
         dep = random.choice(airports)
         # === choose arrival airport with seasonal bias ===
         if season in ["winter", "fall"]:
-            if random.random() < prob_south and south_airports:
+            if random.random() < 0.3 and south_airports:  # 30% chance to go south
+                candidate_pool = [a for a in south_airports if a in airports and a != dep]
+            else:  # 70% random
+                candidate_pool = [a for a in airports if a != dep]
+        else:  # spring/summer
+            if random.random() < 0.3 and north_airports:  # 30% chance to go north
                 candidate_pool = [a for a in north_airports if a in airports and a != dep]
             else:
                 candidate_pool = [a for a in airports if a != dep]
-        elif season in ["spring", "summer"]:
-            if random.random() < prob_north and north_airports:
-                candidate_pool = [a for a in south_airports if a in airports and a != dep]
-            else:
-                candidate_pool = [a for a in airports if a != dep]
 
-        if not candidate_pool:
-            candidate_pool = [a for a in airports if a != dep]
 
         arr = random.choice(candidate_pool)
 
