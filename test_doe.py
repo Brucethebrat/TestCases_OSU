@@ -223,17 +223,34 @@ def generate_scenario(
 
     # === Step 3. select airports based on geo_density ===
     if geo_density == "high":
+        # Find airports within 50 miles of the 3 geo centers (KTEB, KPBI, KIAD)
         nearby_airports = set()
         for cname, (clat, clon) in geo_centers.items():
             for icao, (alat, alon) in airport_coords.items():
                 if haversine(clat, clon, alat, alon) <= 50:
                     nearby_airports.add(icao)
-        # ======= Bruce : this is weird, airports are too dense =======
-        airports = list(nearby_airports)
-        print(f"🌍 High density: {len(airports)} airports within 50 miles of 3 hubs")
+
+        # 🌍 60% of airports concentrated near hubs, 40% from dispersed (200 random airports)
+        all_airports = list(airport_coords.keys())
+        dispersed_airports = random.sample(all_airports, 200)  # 分散區域上限200個
+
+        num_hub = int(0.6 * len(all_airports))
+        num_random = int(0.4 * len(dispersed_airports))
+
+        selected_hub_airports = random.sample(list(nearby_airports), min(num_hub, len(nearby_airports)))
+        selected_random_airports = random.sample(dispersed_airports, num_random)
+
+        # Merge and deduplicate
+        airports = list(set(selected_hub_airports + selected_random_airports))
+
+        print(f"🌍 High density: {len(nearby_airports)} airports within 50 miles of 3 hubs")
+        print(f"📊 Selected mix: {len(selected_hub_airports)} near hubs + {len(selected_random_airports)} random dispersed = {len(airports)} total")
+
     else:
+        # Low density: randomly select 200 airports across the US
         airports = random.sample(list(airport_coords.keys()), 200)
-        print(f"🌎 Low density: Randomly selected {len(airports)} airports")
+        print(f"🌎 Low density: Randomly selected {len(airports)} airports across US")
+
 
     # === tail types ===
     allowed_tailtypes = [
