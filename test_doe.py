@@ -10,11 +10,13 @@ with open("srd.json", "r", encoding="utf-8") as f:
     full_data = json.load(f)
 airport_coords = {}
 us_airports = []
+us_airports_dict = {}
 for a in full_data["StaticRoutingData"]["Airports"]:
     if "Latitude" in a and "Longitude" in a:
         airport_coords[a["ICAOCode"]] = (a["Latitude"], a["Longitude"])
         if a.get("CountryID") == "US":
             us_airports.append(a["ICAOCode"])
+            us_airports_dict[a["ICAOCode"]] = (a["Latitude"], a["Longitude"])
 
 # === Step 2. define 3 hubs and distance function ===
 geo_centers = {
@@ -173,7 +175,8 @@ def generate_scenario(
     event=False,
     maintenance_cycle="low",
     start_time=datetime(2025, 4, 1, 6, 0, 0),
-    season="Winter"     # input season is more intuitive
+    season="Winter",     # input season is more intuitive
+    hub_pattern = "fly_out"
 ):
     
     random.seed(time.time())   
@@ -203,10 +206,12 @@ def generate_scenario(
     if season in ["winter", "fall"]:
         # 30% more flights go south, others random
         prob_south_bias = prob_bias
+        prob_north_bias = 0
         bias_direction = "south"
     else:  # spring/summer
         # 30% more flights go north, others random
-        prob_south_bias = 1 - prob_bias
+        prob_south_bias = 0
+        prob_north_bias = prob_bias
         bias_direction = "north"
 
     print(f"🍂 Auto season={season} (month={month}): 30% bias toward {bias_direction}")
@@ -222,35 +227,17 @@ def generate_scenario(
     south_airports = [icao for icao, (lat, lon) in airport_coords.items() if lat <= 37]
 
     # === Step 3. select airports based on geo_density ===
-    if geo_density == "high":
-        # Find airports within 50 miles of the 3 geo centers (KTEB, KPBI, KIAD)
-        nearby_airports = set()
-        for cname, (clat, clon) in geo_centers.items():
-            for icao, (alat, alon) in airport_coords.items():
-                if haversine(clat, clon, alat, alon) <= 50:
-                    nearby_airports.add(icao)
-
-        # 🌍 60% of airports concentrated near hubs, 40% from dispersed (200 random airports)
-        all_airports = list(airport_coords.keys())
-        dispersed_airports = random.sample(all_airports, 200)  # 分散區域上限200個
-
-        num_hub = int(0.6 * len(all_airports))
-        num_random = int(0.4 * len(dispersed_airports))
-
-        selected_hub_airports = random.sample(list(nearby_airports), min(num_hub, len(nearby_airports)))
-        selected_random_airports = random.sample(dispersed_airports, num_random)
-
-        # Merge and deduplicate
-        airports = list(set(selected_hub_airports + selected_random_airports))
-
-        print(f"🌍 High density: {len(nearby_airports)} airports within 50 miles of 3 hubs")
-        print(f"📊 Selected mix: {len(selected_hub_airports)} near hubs + {len(selected_random_airports)} random dispersed = {len(airports)} total")
-
-    else:
-        # Low density: randomly select 200 airports across the US
-        airports = random.sample(list(airport_coords.keys()), 200)
-        print(f"🌎 Low density: Randomly selected {len(airports)} airports across US")
-
+    nearby_airports = set()
+    for cname, (clat, clon) in geo_centers.items():
+        for icao, (alat, alon) in airport_coords.items():
+            if haversine(clat, clon, alat, alon) <= 50:
+                nearby_airports.add(icao)
+    print(f"🗺️ Found {len(nearby_airports)} airports within 50 miles of 3 hubs.")
+        # 🌍 10% of airports concentrated near hubs, remaining are randomly choose 
+    
+    # Use US airports only
+    all_airports = us_airports
+        
 
     # === tail types ===
     allowed_tailtypes = [
@@ -287,7 +274,7 @@ def generate_scenario(
             "AircraftTypeName": chosen_type,
             # "OriginalAircraftTypeName": chosen_type,
             "AvailableTime": "2025-03-31T01:48:00Z",
-            "CurrentLocation": random.choice(airports),
+            "CurrentLocation": random.choice(all_airports),
             # "BeginTimeForNextMaintenanceAfterPlanningHorizon": "2026-04-01T09:26:48Z",
             "AssignedProperties": [
                 tail_number, chosen_type
@@ -309,23 +296,62 @@ def generate_scenario(
             # "lavSeats": random.choice([0, 1]),
         })
 
+
+
+
     # === generate flight requests ===
     requests = []
     base_dep_counter = Counter() 
+
+    if geo_density == "high":
+        num_hub_reqs = int(0.1 * num_requests)
+        num_random_reqs = num_requests - num_hub_reqs
+        print(f"📍 High density mode: {num_hub_reqs} requests near hubs, {num_random_reqs} random across US.")
+    else:
+        num_hub_reqs = 0
+        num_random_reqs = num_requests
+        print(f"🌎 Low density mode: All {num_random_reqs} requests randomly distributed across US.")
+
+    
+    print(f"🧭 Hub traffic pattern: {hub_pattern}")
+
     for rid in range(1, num_requests + 1):
-        dep = random.choice(airports)
+        # --- Determine if request belongs to hub or random region ---
+        is_hub_request = (geo_density == "high" and rid <= num_hub_reqs and nearby_airports)
+
+        # --- Generate departure & arrival based on hub pattern ---
+        if is_hub_request:
+            if hub_pattern == "fly_out":
+                dep = random.choice(list(nearby_airports))
+                arr = random.choice([a for a in all_airports if a not in nearby_airports and a != dep])
+
+            elif hub_pattern == "fly_in":
+                dep = random.choice([a for a in all_airports if a not in nearby_airports])
+                arr = random.choice(list(nearby_airports))
+
+            else:  # "fly_io" = fly between hubs (hub↔hub)
+                dep = random.choice(list(nearby_airports))
+                arr = random.choice([a for a in nearby_airports if a != dep])
+
+        else:
+            # Random region (low density or 10% random in high density)
+            dep = random.choice(all_airports)
+            arr = random.choice([a for a in all_airports if a != dep])
+
         # === choose arrival airport with seasonal bias ===
         if season in ["winter", "fall"]:
-            if random.random() < 0.3 and south_airports:  # 30% chance to go south
-                candidate_pool = [a for a in south_airports if a in airports and a != dep]
+            if random.random() < prob_south_bias and south_airports:  # 30% chance to go south
+                candidate_pool = [a for a in south_airports if a in all_airports and a != dep]
             else:  # 70% random
-                candidate_pool = [a for a in airports if a != dep]
+                candidate_pool = [a for a in all_airports if a != dep]
         else:  # spring/summer
-            if random.random() < 0.3 and north_airports:  # 30% chance to go north
-                candidate_pool = [a for a in north_airports if a in airports and a != dep]
+            if random.random() < prob_north_bias and north_airports:  # 30% chance to go north
+                candidate_pool = [a for a in north_airports if a in all_airports and a != dep]
             else:
-                candidate_pool = [a for a in airports if a != dep]
+                candidate_pool = [a for a in all_airports if a != dep]
 
+        if not candidate_pool:
+            candidate_pool = [a for a in all_airports if a != dep]
 
         arr = random.choice(candidate_pool)
 
@@ -382,7 +408,7 @@ def generate_scenario(
         # each airport generates 10 times requests
             for j in range(10):
                 dep = ea
-                arr = random.choice([a for a in airports if a != dep])
+                arr = random.choice([a for a in all_airports if a != dep])
                 req_time = start_time + timedelta(minutes=random.randint(0, time_window_days * 24 * 60))
                 req_id = 900000 + len(extra_requests)
                 jet_type = random.choice(allowed_tailtypes)["AircraftTypeName"]
@@ -491,8 +517,8 @@ def generate_scenario(
 #     generate_scenario11_full(exp.values())
 # === Generate multiple scenarios ===
 experiments = [
-    {"arrival_rate": "low", "substitutes": 0, "scale": "low", "geo_density": "high", "time_window_days": 1, "weather": True, "event": False, "maintenance_cycle": "low"},
-    {"arrival_rate": "high", "substitutes": 1, "scale": "high", "geo_density": "low", "time_window_days": 1, "weather": False, "event": True, "maintenance_cycle": "high"},
+    {"arrival_rate": "low", "substitutes": 0, "scale": "low", "geo_density": "high", "hub_pattern": "fly_out", "time_window_days": 1, "weather": True, "event": False, "maintenance_cycle": "low"},
+    {"arrival_rate": "high", "substitutes": 1, "scale": "high", "geo_density": "low", "hub_pattern": "fly_in", "time_window_days": 1, "weather": False, "event": True, "maintenance_cycle": "high"},
 ]
 
 for exp in experiments:
