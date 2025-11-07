@@ -8,12 +8,12 @@ import time
 # === Step 1. read in all airports latitude and longtitude ===
 with open("srd.json", "r", encoding="utf-8") as f:
     full_data = json.load(f)
-airport_coords = {}
+all_airport_coords = {}
 us_airports = []
 us_airports_dict = {}
 for a in full_data["StaticRoutingData"]["Airports"]:
     if "Latitude" in a and "Longitude" in a:
-        airport_coords[a["ICAOCode"]] = (a["Latitude"], a["Longitude"])
+        all_airport_coords[a["ICAOCode"]] = (a["Latitude"], a["Longitude"])
         if a.get("CountryID") == "US":
             us_airports.append(a["ICAOCode"])
             us_airports_dict[a["ICAOCode"]] = (a["Latitude"], a["Longitude"])
@@ -139,36 +139,59 @@ def generate_crewmembers(crewmember_level, allowed_tailtypes, us_airports, start
 # ====================== Bruce ======================
 def generate_crew_activities(crews, us_airports, start_time, time_window_days):
     crew_activities = []
-    activity_types = ["MOVEMENT", "REST", "OPERATE_REVENUE_FLIGHT", "OPERATE_FERRY_FLIGHT", "STATIC_STANDBY"]  # Example activity type codes
+    # activity_types = ["MOVEMENT", "REST", "OPERATE_REVENUE_FLIGHT", "OPERATE_FERRY_FLIGHT", "STATIC_STANDBY"]  # Example activity type codes
+    shift_start_hours = [i for i in range(0, 24, 2)]  # Shifts starting every 2 hours
     for crew in crews:
-        if random.random() < 0.9:
-            continue  # 20% chance to skip adding activities for this crew
+        # if random.random() < 0.9:
+        #     continue  # 20% chance to skip adding activities for this crew
+        shift_start_hour = random.sample(shift_start_hours, k=1)[0]     # sample() returns a list, use [0] to get the value
         crew_id = crew["CrewmemberID"]
         # num_activities = random.randint(3, 6)  # Number of activities per crew
         # for _ in range(num_activities):
         #     # activity_type = random.choice(activity_types)
         activity_type = "REST"  # For simplicity, set all activities to REST
         rest_airport = random.choice(us_airports)
-        activity_start = start_time + timedelta(minutes=random.randint(0, time_window_days * 24 * 60 - 60))
-        duration = random.randint(30, 300)
-        crew_activities.append({
-            "CrewmemberID": crew_id,
-            "ActivityType": activity_type,
-            "OriginAirport": rest_airport,
-            "DestinationAirport": rest_airport,
-            "StartTime": activity_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "Duration": duration,
-        })
+        duration = random.randint(10,14)
+        if shift_start_hour + (duration) > 24:
+            shift_start_hour = 24 - duration - 1  # Adjust to fit within the day
+            activity_start = start_time + timedelta(hours=shift_start_hour)
+            crew_activities.append({
+                "CrewmemberID": crew_id,
+                "ActivityType": activity_type,
+                "OriginAirport": rest_airport,
+                "DestinationAirport": rest_airport,
+                "StartTime": activity_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "Duration": duration,
+            })
+        for day_offset in range(time_window_days):
+            activity_start = start_time + timedelta(days=day_offset, hours=shift_start_hour)
+            crew_activities.append({
+                "CrewmemberID": crew_id,
+                "ActivityType": activity_type,
+                "OriginAirport": rest_airport,
+                "DestinationAirport": rest_airport,
+                "StartTime": activity_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "Duration": duration,
+            })
     return crew_activities
 
 
+def pick_2_random_airports_for_req(pool1, pool2):
+    dep = random.choice(pool1)
+    arr = random.choice(pool2)
+    while arr == dep:
+        arr = random.choice(pool2)
+    return dep, arr
 
 
 # === DOE factors ===
 def generate_scenario(
+    area="US",
     arrival_rate="low",
     substitutes=0,
     scale="low",
+    maintenance_scale="low",
+    maintenance_airport_number="low",
     geo_density="low",
     time_window_days=1,
     weather=False,
@@ -179,11 +202,12 @@ def generate_scenario(
     hub_pattern = "fly_out"
 ):
     
-    random.seed(time.time())   
-    # ====================== Bruce ======================
+    random.seed(time.time())
+    airports = us_airports if area == "US" else list(all_airport_coords.keys())     # list of ICAO codes
+    airport_coords = us_airports_dict if area == "US" else all_airport_coords       # ICAO to (lat, lon) dict
+    
     crew_included = True
     crewmember_level = "low"      # low / mid / high = 1500 / 2000 / 2500 crews
-    # ====================== Bruce ======================
 
 
     # ========== Bruce: don't need this once we have season input ==========
@@ -221,22 +245,30 @@ def generate_scenario(
     scale_map = {"low": 500, "high": 1000}
     num_tails = scale_map[scale]
     num_requests = num_tails * (2 if arrival_rate == "low" else 4) * time_window_days
+    
+    mx_scale_map = {"low": 0.1, "high": 0.3}
+    mx_num = mx_scale_map[maintenance_scale] * num_tails * time_window_days
+
+    mx_airport_map = {"low": 20, "mid": 50, "high": 100}
+    mx_airport_num = mx_airport_map[maintenance_airport_number]
+    mx_airport = []
+    for _ in range(mx_airport_num):
+        mx_airport.append(random.choice(list(airport_coords.keys())))
+
 
     # === classify airports into north/south (based on latitude 37°N) ===
     north_airports = [icao for icao, (lat, lon) in airport_coords.items() if lat > 37]
     south_airports = [icao for icao, (lat, lon) in airport_coords.items() if lat <= 37]
 
     # === Step 3. select airports based on geo_density ===
-    nearby_airports = set()
+    nearby_airports = []
     for cname, (clat, clon) in geo_centers.items():
         for icao, (alat, alon) in airport_coords.items():
             if haversine(clat, clon, alat, alon) <= 50:
-                nearby_airports.add(icao)
+                nearby_airports.append(icao)
     print(f"🗺️ Found {len(nearby_airports)} airports within 50 miles of 3 hubs.")
         # 🌍 10% of airports concentrated near hubs, remaining are randomly choose 
     
-    # Use US airports only
-    all_airports = us_airports
         
 
     # === tail types ===
@@ -273,8 +305,8 @@ def generate_scenario(
             "TailNumber": tail_number,
             "AircraftTypeName": chosen_type,
             # "OriginalAircraftTypeName": chosen_type,
-            "AvailableTime": "2025-03-31T01:48:00Z",
-            "CurrentLocation": random.choice(all_airports),
+            "AvailableTime": "2025-03-31T01:48:00Z",        # modify to random, or make it difficult to schedule
+            "CurrentLocation": random.choice(airports),
             # "BeginTimeForNextMaintenanceAfterPlanningHorizon": "2026-04-01T09:26:48Z",
             "AssignedProperties": [
                 tail_number, chosen_type
@@ -322,38 +354,43 @@ def generate_scenario(
         # --- Generate departure & arrival based on hub pattern ---
         if is_hub_request:
             if hub_pattern == "fly_out":
-                dep = random.choice(list(nearby_airports))
-                arr = random.choice([a for a in all_airports if a not in nearby_airports and a != dep])
+                dep, arr = pick_2_random_airports_for_req(nearby_airports, airports)
 
             elif hub_pattern == "fly_in":
-                dep = random.choice([a for a in all_airports if a not in nearby_airports])
-                arr = random.choice(list(nearby_airports))
-
+                arr, dep = pick_2_random_airports_for_req(nearby_airports, airports)
+                
             else:  # "fly_io" = fly between hubs (hub↔hub)
-                dep = random.choice(list(nearby_airports))
-                arr = random.choice([a for a in nearby_airports if a != dep])
+                rd_num = random.random()
+                # 1/3 chance for each of the 3 patterns
+                if rd_num < 1/3.0:
+                    dep, arr = pick_2_random_airports_for_req(nearby_airports, airports)
+                elif rd_num < 2/3.0:
+                    arr, dep = pick_2_random_airports_for_req(nearby_airports, airports)
+                else:
+                    dep, arr = random.sample(nearby_airports,2)
+                    
 
         else:
             # Random region (low density or 10% random in high density)
-            dep = random.choice(all_airports)
-            arr = random.choice([a for a in all_airports if a != dep])
+            arr, dep = pick_2_random_airports_for_req(airports, airports)
 
-        # === choose arrival airport with seasonal bias ===
-        if season in ["winter", "fall"]:
-            if random.random() < prob_south_bias and south_airports:  # 30% chance to go south
-                candidate_pool = [a for a in south_airports if a in all_airports and a != dep]
-            else:  # 70% random
-                candidate_pool = [a for a in all_airports if a != dep]
-        else:  # spring/summer
-            if random.random() < prob_north_bias and north_airports:  # 30% chance to go north
-                candidate_pool = [a for a in north_airports if a in all_airports and a != dep]
-            else:
-                candidate_pool = [a for a in all_airports if a != dep]
+        # Season conflict with geo density, skip for now, fix in future version
+        # # === choose arrival airport with seasonal bias ===
+        # if season in ["winter", "fall"]:
+        #     if random.random() < prob_south_bias and south_airports:  # 30% chance to go south
+        #         candidate_pool = [a for a in south_airports if a in airports and a != dep]
+        #     else:  # 70% random
+        #         candidate_pool = [a for a in airports if a != dep]
+        # else:  # spring/summer
+        #     if random.random() < prob_north_bias and north_airports:  # 30% chance to go north
+        #         candidate_pool = [a for a in north_airports if a in airports and a != dep]
+        #     else:
+        #         candidate_pool = [a for a in airports if a != dep]
 
-        if not candidate_pool:
-            candidate_pool = [a for a in all_airports if a != dep]
+        # if not candidate_pool:
+        #     candidate_pool = [a for a in airports if a != dep]
 
-        arr = random.choice(candidate_pool)
+        # arr = random.choice(candidate_pool)
 
         req_time = start_time + timedelta(minutes=random.randint(0, time_window_days * 24 * 60))
         req_id = 50000 + rid
@@ -408,7 +445,7 @@ def generate_scenario(
         # each airport generates 10 times requests
             for j in range(10):
                 dep = ea
-                arr = random.choice([a for a in all_airports if a != dep])
+                arr = random.choice([a for a in airports if a != dep])
                 req_time = start_time + timedelta(minutes=random.randint(0, time_window_days * 24 * 60))
                 req_id = 900000 + len(extra_requests)
                 jet_type = random.choice(allowed_tailtypes)["AircraftTypeName"]
