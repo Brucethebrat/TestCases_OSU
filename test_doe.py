@@ -34,7 +34,7 @@ def haversine(lat1, lon1, lat2, lon2):
     a = sin(dlat / 2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2)**2
     return R * 2 * atan2(sqrt(a), sqrt(1 - a))
 
-def compute_weather_shutdown_airports(epicenter_icao: str, radius_miles: float,
+def airports_inside_circle(epicenter_icao: str, radius_miles: float,
                                       airport_coords: dict) -> set:
     """retrun epicenter radius radius_miles all affected airports in ICAO set。"""
     if epicenter_icao not in airport_coords:
@@ -203,8 +203,25 @@ def generate_scenario(
 ):
     
     random.seed(time.time())
-    airports = us_airports if area == "US" else list(all_airport_coords.keys())     # list of ICAO codes
-    airport_coords = us_airports_dict if area == "US" else all_airport_coords       # ICAO to (lat, lon) dict
+
+
+    # remove weather airports at the beginning, so that no one request to/from there
+    if weather:
+        # randomly choose a weather affected airport in US as a center
+        epicenter = random.choice(us_airports)
+        # find out all the affected airport within 30 miles 
+        weather_affected_airports = airports_inside_circle(epicenter, 30.0, airport_coords)
+
+    # designate available airports
+    if area == "US":
+        airports = [airport for airport in us_airports if airport not in weather_affected_airports]     # list of ICAO codes
+        airport_coords = us_airports_dict
+        for icao in weather_affected_airports:
+            if icao in airport_coords:
+                del airport_coords[icao]
+    else: 
+        airports = list(all_airport_coords.keys())
+        airport_coords = all_airport_coords       # ICAO to (lat, lon) dict
     
     crew_included = True
     crewmember_level = "low"      # low / mid / high = 1500 / 2000 / 2500 crews
@@ -255,6 +272,12 @@ def generate_scenario(
     for _ in range(mx_airport_num):
         mx_airport.append(random.choice(list(airport_coords.keys())))
 
+    # 
+    if weather:
+        # randomly choose a weather affected airport in US as a center
+        epicenter = random.choice(us_airports)
+        # find out all the affected airport within 30 miles 
+        weather_affected_airports = airports_inside_circle(epicenter, 30.0, airport_coords)
 
     # === classify airports into north/south (based on latitude 37°N) ===
     north_airports = [icao for icao, (lat, lon) in airport_coords.items() if lat > 37]
@@ -374,23 +397,23 @@ def generate_scenario(
             # Random region (low density or 10% random in high density)
             arr, dep = pick_2_random_airports_for_req(airports, airports)
 
-        # Season conflict with geo density, skip for now, fix in future version
-        # # === choose arrival airport with seasonal bias ===
-        # if season in ["winter", "fall"]:
-        #     if random.random() < prob_south_bias and south_airports:  # 30% chance to go south
-        #         candidate_pool = [a for a in south_airports if a in airports and a != dep]
-        #     else:  # 70% random
-        #         candidate_pool = [a for a in airports if a != dep]
-        # else:  # spring/summer
-        #     if random.random() < prob_north_bias and north_airports:  # 30% chance to go north
-        #         candidate_pool = [a for a in north_airports if a in airports and a != dep]
-        #     else:
-        #         candidate_pool = [a for a in airports if a != dep]
+        '''Season conflict with geo density, skip for now, fix in future version
+        # === choose arrival airport with seasonal bias ===
+        if season in ["winter", "fall"]:
+            if random.random() < prob_south_bias and south_airports:  # 30% chance to go south
+                candidate_pool = [a for a in south_airports if a in airports and a != dep]
+            else:  # 70% random
+                candidate_pool = [a for a in airports if a != dep]
+        else:  # spring/summer
+            if random.random() < prob_north_bias and north_airports:  # 30% chance to go north
+                candidate_pool = [a for a in north_airports if a in airports and a != dep]
+            else:
+                candidate_pool = [a for a in airports if a != dep]
 
-        # if not candidate_pool:
-        #     candidate_pool = [a for a in airports if a != dep]
+        if not candidate_pool:
+            candidate_pool = [a for a in airports if a != dep]
 
-        # arr = random.choice(candidate_pool)
+        arr = random.choice(candidate_pool)'''
 
         req_time = start_time + timedelta(minutes=random.randint(0, time_window_days * 24 * 60))
         req_id = 50000 + rid
@@ -421,6 +444,34 @@ def generate_scenario(
         requests.append(req)
         base_dep_counter[dep] += 1
 
+
+
+    # === generate mx requests ===
+    for mx_id in range(int(mx_num)):
+        dep = random.choice(mx_airport)
+        arr = dep
+        req_time = start_time + timedelta(minutes=random.randint(0, time_window_days * 24 * 60))
+        service_time = random.randint(4, 24)*60  # maintenance time between 4 hours to 24 hours
+        req_id = 80000 + mx_id
+        required_tail_obj = random.choice(tails)
+        required_tail = required_tail_obj["TailNumber"]
+        jet_type = required_tail_obj["AircraftTypeName"]
+
+        requests.append({
+            "RequestID": req_id,
+            "RequiredTail": required_tail,
+            "ArrivalAirport": arr,
+            "DepartureAirport": dep,
+            "ActivityType": "MAINTENANCE",
+            "RequestedTime": req_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "ServiceTime": service_time,
+            "AllowedTailTypes": [{"AircraftTypeName": jet_type, "Penalty": 0}],
+            "requestedAircraftTypeName": jet_type,
+            "TailRequiredProperties": []
+        })
+
+
+
     
     # ====================== Bruce ======================
 
@@ -437,12 +488,12 @@ def generate_scenario(
     extra_requests = []
     if event:
         epicenter_event = random.choice(us_airports)
-        event_airports = compute_weather_shutdown_airports(epicenter_event, 30.0, airport_coords)
+        event_airports = airports_inside_circle(epicenter_event, 30.0, airport_coords)
         print(f"🎪 Event at {epicenter_event}: {len(event_airports)} airports within 30mi have surge demand")
 
         # extra_requests = []
         for ea in event_airports:
-        # each airport generates 10 times requests
+        # each airport generates 10 requests
             for j in range(10):
                 dep = ea
                 arr = random.choice([a for a in airports if a != dep])
@@ -470,21 +521,15 @@ def generate_scenario(
     # === Weather event ===
     legs = []
     if weather:
-        # 1. randomly choose a weather affected airport in US as a center
-        epicenter = random.choice(us_airports)
-
-        # 2. find out all the affected airport within 30 miles 
-        affected_airports = compute_weather_shutdown_airports(epicenter, 30.0, airport_coords)
-
         # 3. find all tails located at the affected airports  
-        affected_tails = [t for t in tails if t["CurrentLocation"] in affected_airports]
+        affected_tails = [t for t in tails if t["CurrentLocation"] in weather_affected_airports]
 
-        print(f"🌩️ Weather at {epicenter} (US only): shutdown {len(affected_airports)} airports within 30mi, affecting {len(affected_tails)} tails")
+        print(f"🌩️ Weather at {epicenter} (US only): shutdown {len(weather_affected_airports)} airports within 30mi, affecting {len(affected_tails)} tails")
 
         # 4. generate locked legs for the affected tails (grounded for the entire planning window)
         weather_legs = build_grounding_legs_for_tails(
             tails=tails,
-            affected_airports=affected_airports,
+            weather_affected_airports=weather_affected_airports,
             start_time_dt=start_time,
             time_window_days=time_window_days,
             starting_leg_id=50_000_000
@@ -520,7 +565,7 @@ def generate_scenario(
         "Weather": {
             "Enabled": weather,
             "Epicenter": epicenter if weather else None,
-            "AffectedAirports": sorted(list(affected_airports)) if weather else [],
+            "AffectedAirports": sorted(list(weather_affected_airports)) if weather else [],
         },
         
         # ====================== Bruce ======================
