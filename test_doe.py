@@ -145,26 +145,26 @@ def generate_crewmembers(crewmember_level, allowed_tailtypes, airports, start_ti
         })
     
     # ====================== Vivian ======================
-    FAnum = int(0.1 * num_crews)
+    # FAnum = int(0.1 * num_crews)
 
-    for FAid in range(1, FAnum + 1):
-        crew_id = crewID_start + num_crews + FAid     #ensure no overlap with previous section
-        roster_length = random.randint(5, 8)
-        tour_start_time = start_time + timedelta(hours=random.randint(-roster_length * 24, time_window_days * 24))
-        tour_end_time = tour_start_time + timedelta(minutes=roster_length * 24 * 60 + 13 * 60 - 1)
-        airport_domicile = random.choice(airports)
-        current_loc = airport_domicile if random.random() < 0.9 else random.choice(airports)
-        qualified_types = generate_allowed_tailtypes(allowed_tailtypes)
+    # for FAid in range(1, FAnum + 1):
+    #     crew_id = crewID_start + num_crews + FAid     #ensure no overlap with previous section
+    #     roster_length = random.randint(5, 8)
+    #     tour_start_time = start_time + timedelta(hours=random.randint(-roster_length * 24, time_window_days * 24))
+    #     tour_end_time = tour_start_time + timedelta(minutes=roster_length * 24 * 60 + 13 * 60 - 1)
+    #     airport_domicile = random.choice(airports)
+    #     current_loc = airport_domicile if random.random() < 0.9 else random.choice(airports)
+    #     qualified_types = generate_allowed_tailtypes(allowed_tailtypes)
 
-        crews.append({
-            "CrewmemberID": crew_id,
-            "QualificationCode": "FA",  
-            "CurrentLocation": current_loc,
-            "AirportIDDomicile": airport_domicile,
-            "tourStartDate": tour_start_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "tourEndDate": tour_end_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "CrewmemberQualifications": qualified_types
-        })
+    #     crews.append({
+    #         "CrewmemberID": crew_id,
+    #         "QualificationCode": "FA",  
+    #         "CurrentLocation": current_loc,
+    #         "AirportIDDomicile": airport_domicile,
+    #         "tourStartDate": tour_start_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+    #         "tourEndDate": tour_end_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+    #         "CrewmemberQualifications": qualified_types
+    #     })
 
     return crews
 
@@ -588,18 +588,23 @@ def generate_scenario(
     # split airports by longtitude
     east_airports = [a for a, (_, lon) in airport_coords.items() if lon > -95]
     west_airports = [a for a, (_, lon) in airport_coords.items() if lon <= -95]
+    mx_airport_num = 50
 
     # control directions 
     if maintenance_airport_distribution == "east":
-        num_east = int(0.7 * len(east_airports))
-        num_west = int(0.3 * len(west_airports))
+        # num_east = int(0.7 * len(east_airports))
+        # num_west = int(0.3 * len(west_airports))
+        num_east = int(0.7 * mx_airport_num)
+        num_west = int(0.3 * mx_airport_num)
         selected_east = random.sample(east_airports, num_east)
         selected_west = random.sample(west_airports, num_west)
         mx_airport = selected_east + selected_west
 
     elif maintenance_airport_distribution == "west":
-        num_west = int(0.7 * len(west_airports))
-        num_east = int(0.3 * len(east_airports))
+        # num_west = int(0.7 * len(west_airports))
+        # num_east = int(0.3 * len(east_airports))
+        num_east = int(0.3 * mx_airport_num)
+        num_west = int(0.7 * mx_airport_num)
         selected_west = random.sample(west_airports, num_west)
         selected_east = random.sample(east_airports, num_east)
         mx_airport = selected_east + selected_west
@@ -787,11 +792,11 @@ def generate_scenario(
             {"PositionInCrew": "SIC", "CrewmemberRequiredProperties": [], "CrewmemberRestrictedProperties": []},
         ]
 
-        # 20% chance to add FA if jet is a big plane
-        if jet_type in big_planes and random.random() < 0.2:
-            crewmember_req.append(
-                {"PositionInCrew": "FA", "CrewmemberRequiredProperties": [], "CrewmemberRestrictedProperties": []},
-            )
+        # # 20% chance to add FA if jet is a big plane
+        # if jet_type in big_planes and random.random() < 0.2:
+        #     crewmember_req.append(
+        #         {"PositionInCrew": "FA", "CrewmemberRequiredProperties": [], "CrewmemberRestrictedProperties": []},
+        #     )
 
         # === consruct request ===  
         req = {
