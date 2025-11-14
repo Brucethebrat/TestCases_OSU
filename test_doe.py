@@ -138,6 +138,26 @@ def generate_allowed_tailtypes(allowed_tailtypes):
         })
     return rand_allowed_tailtypes
 
+# ====================== Vivian ======================
+def generate_allowed_tailtypes_FA(allowed_tailtypes):
+    rand_allowed_tailtypes = []
+    big_planes = ["CL-650S", "GL5500", "CE-700", "GL6000S", "CE-680AS"]
+    # filter allowed_tailtypes to only big planes
+    big_plane_types = [t for t in allowed_tailtypes if t["AircraftTypeName"] in big_planes]
+
+    if not big_plane_types:
+        # fallback if none
+        big_plane_types = allowed_tailtypes
+
+    # Randomly sample 1–4 from big planes only
+    temp_types = random.sample(big_plane_types, k=random.randint(1, min(len(big_plane_types), 4)))
+
+    for t in temp_types:
+        rand_allowed_tailtypes.append({
+            "AircraftTypeName": t["AircraftTypeName"],
+            "QualificationCode": "FA"
+        })
+    return rand_allowed_tailtypes
 
 # ====================== Bruce ======================
 def generate_crewmembers(crewmember_level, allowed_tailtypes, airports, start_time, time_window_days):
@@ -173,26 +193,25 @@ def generate_crewmembers(crewmember_level, allowed_tailtypes, airports, start_ti
         })
     
     # ====================== Vivian ======================
-    # FAnum = int(0.1 * num_crews)
+    FAnum = int(0.1 * num_crews)
 
-    # for FAid in range(1, FAnum + 1):
-    #     crew_id = crewID_start + num_crews + FAid     #ensure no overlap with previous section
-    #     roster_length = random.randint(5, 8)
-    #     tour_start_time = start_time + timedelta(hours=random.randint(-roster_length * 24, time_window_days * 24))
-    #     tour_end_time = tour_start_time + timedelta(minutes=roster_length * 24 * 60 + 13 * 60 - 1)
-    #     airport_domicile = random.choice(airports)
-    #     current_loc = airport_domicile if random.random() < 0.9 else random.choice(airports)
-    #     qualified_types = generate_allowed_tailtypes(allowed_tailtypes)
+    for FAid in range(1, FAnum + 1):
+        crew_id = crewID_start + num_crews + FAid     #ensure no overlap with previous section
+        roster_length = random.randint(5, 8)
+        tour_start_time = start_time + timedelta(hours=random.randint(-roster_length * 24, time_window_days * 24))
+        tour_end_time = tour_start_time + timedelta(minutes=roster_length * 24 * 60 + 13 * 60 - 1)
+        airport_domicile = random.choice(airports)
+        current_loc = airport_domicile if random.random() < 0.9 else random.choice(airports)
+        qualified_types = generate_allowed_tailtypes_FA(allowed_tailtypes)
 
-    #     crews.append({
-    #         "CrewmemberID": crew_id,
-    #         "QualificationCode": "FA",  
-    #         "CurrentLocation": current_loc,
-    #         "AirportIDDomicile": airport_domicile,
-    #         "tourStartDate": tour_start_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
-    #         "tourEndDate": tour_end_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
-    #         "CrewmemberQualifications": qualified_types
-    #     })
+        crews.append({
+            "CrewmemberID": crew_id,
+            "CurrentLocation": current_loc,
+            "AirportIDDomicile": airport_domicile,
+            "tourStartDate": tour_start_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "tourEndDate": tour_end_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "CrewmemberQualifications": qualified_types
+        })
 
     return crews
 
