@@ -161,8 +161,8 @@ def generate_crewmembers(crewmember_level, allowed_tailtypes, airports, start_ti
             "QualificationCode": "FA",  
             "CurrentLocation": current_loc,
             "AirportIDDomicile": airport_domicile,
-            "TourStartDate": tour_start_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "TourEndDate": tour_end_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "tourStartDate": tour_start_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "tourEndDate": tour_end_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
             "CrewmemberQualifications": qualified_types
         })
 
