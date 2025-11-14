@@ -9,14 +9,42 @@ import time
 with open("srd.json", "r", encoding="utf-8") as f:
     full_data = json.load(f)
 all_airport_coords = {}
-us_airports = []
-us_airports_dict = {}
+all_us_airports = []
+all_us_airports_dict = {}
 for a in full_data["StaticRoutingData"]["Airports"]:
     if "Latitude" in a and "Longitude" in a:
         all_airport_coords[a["ICAOCode"]] = (a["Latitude"], a["Longitude"])
         if a.get("CountryID") == "US":
-            us_airports.append(a["ICAOCode"])
-            us_airports_dict[a["ICAOCode"]] = (a["Latitude"], a["Longitude"])
+            all_us_airports.append(a["ICAOCode"])
+            all_us_airports_dict[a["ICAOCode"]] = (a["Latitude"], a["Longitude"])
+
+# airports_ICAO_and_coord_dict = full_data["StaticRoutingData"]["Airports"]
+# airports_ICAO_dict = [a["ICAOCode"] for a in airports_ICAO_and_coord_dict]
+
+routingCache = full_data["StaticRoutingData"]["RoutingCache"]
+airports = routingCache["Airports"]
+aircrafts = routingCache["AircraftTypeNames"]
+routes = routingCache["Routes"]
+
+cache_airport_coords = {}
+us_airports = []
+us_airports_dict = {}
+
+print(f"[+] There are {len(airports)} airports.")
+print(f"first 5 airports: {airports[:5]}")
+# exit()
+for a_ICAO in airports:
+    if a_ICAO not in all_airport_coords.keys():
+        airports.remove(a_ICAO)
+        print(f"[-] Removed airport {a_ICAO} as it has no coordinates.")
+        continue
+    cache_airport_coords[a_ICAO] = all_airport_coords[a_ICAO]
+    if a_ICAO in all_us_airports:
+        us_airports.append(a_ICAO)
+        us_airports_dict[a_ICAO] = all_airport_coords[a_ICAO]
+
+
+        
 
 # === Step 2. define 3 hubs and distance function ===
 geo_centers = {
