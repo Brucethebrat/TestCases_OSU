@@ -972,11 +972,11 @@ def generate_scenario(
         **({"Legs": legs} if weather else {}),
         **({"Crewmembers": crews} if crew_included else {}),    # ====================== Bruce ======================
         **({"CrewActivities": crew_activities} if crew_included else {}),    # ====================== Bruce ======================
-        "Weather": {
-            "Enabled": weather,
-            "Epicenter": epicenter if weather else None,
-            "AffectedAirports": sorted(list(weather_affected_airports)) if weather else [],
-        },
+        # "Weather": {
+        #     "Enabled": weather,
+        #     "Epicenter": epicenter if weather else None,
+        #     "AffectedAirports": sorted(list(weather_affected_airports)) if weather else [],
+        # },
         
         # ====================== Bruce ======================
         "CrewFlyingTogether": crew_fly_together if crew_included else [],
