@@ -44,7 +44,7 @@ for a_ICAO in airports:
         us_airports_dict[a_ICAO] = all_airport_coords[a_ICAO]
 
 
-        
+
 
 # === Step 2. define 3 hubs and distance function ===
 geo_centers = {
@@ -193,25 +193,25 @@ def generate_crewmembers(crewmember_level, allowed_tailtypes, airports, start_ti
         })
     
     # ====================== Vivian ======================
-    FAnum = int(0.1 * num_crews)
+    # FAnum = int(0.1 * num_crews)
 
-    for FAid in range(1, FAnum + 1):
-        crew_id = crewID_start + num_crews + FAid     #ensure no overlap with previous section
-        roster_length = random.randint(5, 8)
-        tour_start_time = start_time + timedelta(hours=random.randint(-roster_length * 24, time_window_days * 24))
-        tour_end_time = tour_start_time + timedelta(minutes=roster_length * 24 * 60 + 13 * 60 - 1)
-        airport_domicile = random.choice(airports)
-        current_loc = airport_domicile if random.random() < 0.9 else random.choice(airports)
-        qualified_types = generate_allowed_tailtypes_FA(allowed_tailtypes)
+    # for FAid in range(1, FAnum + 1):
+    #     crew_id = crewID_start + num_crews + FAid     #ensure no overlap with previous section
+    #     roster_length = random.randint(5, 8)
+    #     tour_start_time = start_time + timedelta(hours=random.randint(-roster_length * 24, time_window_days * 24))
+    #     tour_end_time = tour_start_time + timedelta(minutes=roster_length * 24 * 60 + 13 * 60 - 1)
+    #     airport_domicile = random.choice(airports)
+    #     current_loc = airport_domicile if random.random() < 0.9 else random.choice(airports)
+    #     qualified_types = generate_allowed_tailtypes_FA(allowed_tailtypes)
 
-        crews.append({
-            "CrewmemberID": crew_id,
-            "CurrentLocation": current_loc,
-            "AirportIDDomicile": airport_domicile,
-            "tourStartDate": tour_start_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "tourEndDate": tour_end_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "CrewmemberQualifications": qualified_types
-        })
+    #     crews.append({
+    #         "CrewmemberID": crew_id,
+    #         "CurrentLocation": current_loc,
+    #         "AirportIDDomicile": airport_domicile,
+    #         "tourStartDate": tour_start_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+    #         "tourEndDate": tour_end_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+    #         "CrewmemberQualifications": qualified_types
+    #     })
 
     return crews
 
@@ -972,11 +972,11 @@ def generate_scenario(
         **({"Legs": legs} if weather else {}),
         **({"Crewmembers": crews} if crew_included else {}),    # ====================== Bruce ======================
         **({"CrewActivities": crew_activities} if crew_included else {}),    # ====================== Bruce ======================
-        "Weather": {
-            "Enabled": weather,
-            "Epicenter": epicenter if weather else None,
-            "AffectedAirports": sorted(list(weather_affected_airports)) if weather else [],
-        },
+        # "Weather": {
+        #     "Enabled": weather,
+        #     "Epicenter": epicenter if weather else None,
+        #     "AffectedAirports": sorted(list(weather_affected_airports)) if weather else [],
+        # },
         
         # ====================== Bruce ======================
         "CrewFlyingTogether": crew_fly_together if crew_included else [],
