@@ -120,21 +120,26 @@ def build_grounding_legs_for_tails(tails: list, affected_airports: set,
 
 
 # ====================== Bruce ======================
-def generate_allowed_tailtypes(allowed_tailtypes):
+def generate_allowed_tailtypes(allowed_tailtypes, start_time):
     rand_allowed_tailtypes = []
     temp_types = random.sample(allowed_tailtypes, k=random.randint(1, min(len(allowed_tailtypes), 4)))
+    
+    day_exp = (start_time + timedelta(days=365)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    night_exp = (start_time + timedelta(days=365)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    qual_start = start_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+
     for t in temp_types:
         rand_allowed_tailtypes.append({
             "AircraftTypeName": t["AircraftTypeName"],
             "QualificationCode": "PIC",
-            "dayCurrencyExpiration": "2026-06-19T23:59:00Z",
-            "nightCurrencyExpiration": "2026-06-19T23:59:00Z",
-            "qualificationStartDate": "1900-01-01T00:00:00Z"
+            "dayCurrencyExpiration": day_exp,
+            "nightCurrencyExpiration": night_exp,
+            "qualificationStartDate": qual_start
         })
         rand_allowed_tailtypes.append({
             "AircraftTypeName": t["AircraftTypeName"],
             "QualificationCode": "SIC",
-            "qualificationStartDate": "1900-01-01T00:00:00Z"
+            "qualificationStartDate": qual_start
         })
     return rand_allowed_tailtypes
 
@@ -181,7 +186,7 @@ def generate_crewmembers(crewmember_level, allowed_tailtypes, airports, start_ti
         tour_end_time = tour_start_time + timedelta(minutes=roster_length * 24 * 60 + 13 * 60 - 1)      # add 13 hours because found schedule_sanitized crew pattern
         airport_domicile = random.choice(airports)
         current_loc = airport_domicile if random.random() < 0.9 else random.choice(airports)
-        qualified_types = generate_allowed_tailtypes(allowed_tailtypes)
+        qualified_types = generate_allowed_tailtypes(allowed_tailtypes, start_time)
 
         crews.append({
             "CrewmemberID": crew_id,
@@ -561,11 +566,15 @@ def generate_scenario(
     weather=False,
     event=False,
     maintenance_cycle="low",
-    start_time=datetime(2025, 4, 1, 6, 0, 0),
+    start_time=None,
     season="Winter",     # input season is more intuitive
     hub_pattern = "fly_out"
 ):
     
+    if start_time is None:
+        start_time = datetime.now().replace(hour=6, minute=0, second=0, microsecond=0)
+        print(f"⏰ start_time not provided → default = {start_time}")
+
     random.seed(time.time())
 
     weather_affected_airports = set()
@@ -731,7 +740,7 @@ def generate_scenario(
             "TailNumber": tail_number,
             "AircraftTypeName": chosen_type,
             # "OriginalAircraftTypeName": chosen_type,
-            "AvailableTime": "2025-03-31T01:48:00Z",        # modify to random, or make it difficult to schedule
+            "AvailableTime": (start_time - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ"),        # modify to random, or make it difficult to schedule
             "CurrentLocation": random.choice(airports),
             # "BeginTimeForNextMaintenanceAfterPlanningHorizon": "2026-04-01T09:26:48Z",
             "AssignedProperties": [
@@ -945,8 +954,16 @@ def generate_scenario(
             time_window_days=time_window_days,
             starting_leg_id=starting_leg_id
         )
+
+        # combined weather legs to legs
+        legs.extend(weather_legs)
+
     else:
         weather_legs = []
+
+    print(f"[DEBUG] Crew-generated legs: {len(legs) - len(weather_legs)}")
+    print(f"[DEBUG] Weather legs: {len(weather_legs)}")
+    print(f"[DEBUG] Final total legs: {len(legs)}")
 
     # === save scenario ===
     scenario = {
@@ -967,9 +984,9 @@ def generate_scenario(
     # === Scenario output ===
     scenario = {
         "Tails": tails,
-        "FlightRequests": requests + extra_requests,
-        # only when weather=True add Legs
-        **({"Legs": legs} if weather else {}),
+        "FlightRequests": requests,
+        # always output legs
+        "Legs": legs,
         **({"Crewmembers": crews} if crew_included else {}),    # ====================== Bruce ======================
         **({"CrewActivities": crew_activities} if crew_included else {}),    # ====================== Bruce ======================
         "Weather": {
