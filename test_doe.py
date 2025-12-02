@@ -557,8 +557,10 @@ def pick_2_random_airports_for_req(pool1, pool2):
 def generate_scenario(
     area="US",
     arrival_rate="low",
-    substitutes=0,
-    tail_scale="low",    
+    substitutes=0,          # change to low / high later
+    tail_scale="low",
+    crew_included = True,
+    crewmember_level = "low",      # low / mid / high = 1500 / 2000 / 2500 crews
     maintenance_scale="low",
     maintenance_airport_distribution ="east",
     geo_density="low",
@@ -567,7 +569,7 @@ def generate_scenario(
     event=False,
     maintenance_cycle="low",
     start_time=None,
-    season="Winter",     # input season is more intuitive
+    season="Winter",        # removed for now
     hub_pattern = "fly_out"
 ):
     
@@ -591,12 +593,12 @@ def generate_scenario(
         # Build a dict of coords for only the airports in `airports` (safe subset copy)
         airport_coords = {icao: all_airport_coords[icao] for icao in airports if icao in all_airport_coords}
         # The `airports` list already excludes weather-affected airports, so no deletion needed
-    else: 
+    elif area == "Global": 
         airports = list(all_airport_coords.keys())
         airport_coords = all_airport_coords       # ICAO to (lat, lon) dict
+    else:
+        raise ValueError(f"Invalid area: {area}, must be 'US' or 'Global'.")
     
-    crew_included = True
-    crewmember_level = "low"      # low / mid / high = 1500 / 2000 / 2500 crews
 
 
     # ========== Bruce: don't need this once we have season input ==========
@@ -712,9 +714,13 @@ def generate_scenario(
     if maintenance_cycle == "low":
         min_left_range = (200, 400)
         cycle_left_range = (2, 5)
-    else:
+    elif maintenance_cycle == "high":
         min_left_range = (1200, 2000)
         cycle_left_range = (40, 60)
+    else:
+        print("[-] Invalid maintenance_cycle, defaulting to low")
+        min_left_range = (200, 400)
+        cycle_left_range = (2, 5)
 
 
     
@@ -774,11 +780,12 @@ def generate_scenario(
         num_hub_reqs = int(0.1 * num_requests)
         num_random_reqs = num_requests - num_hub_reqs
         print(f"📍 High density mode: {num_hub_reqs} requests near hubs, {num_random_reqs} random across US.")
-    else:
+    elif "low":        
         num_hub_reqs = 0
         num_random_reqs = num_requests
         print(f"🌎 Low density mode: All {num_random_reqs} requests randomly distributed across US.")
-
+    else:
+        raise ValueError(f"Invalid geo_density: {geo_density}")
     
     print(f"🧭 Hub traffic pattern: {hub_pattern}")
 
@@ -794,7 +801,7 @@ def generate_scenario(
             elif hub_pattern == "fly_in":
                 arr, dep = pick_2_random_airports_for_req(nearby_airports, airports)
                 
-            else:  # "fly_io" = fly between hubs (hub↔hub)
+            elif hub_pattern == " fly_io":  # "fly_io" = fly between hubs (hub↔hub)
                 rd_num = random.random()
                 # 1/3 chance for each of the 3 patterns
                 if rd_num < 1/3.0:
@@ -804,6 +811,8 @@ def generate_scenario(
                 else:
                     dep, arr = random.sample(nearby_airports,2)
                     
+            else:
+                raise ValueError(f"Invalid hub_pattern: {hub_pattern}")
 
         else:
             # Random region (low density or 10% random in high density)
@@ -834,10 +843,13 @@ def generate_scenario(
         # AllowedTailTypes
         if substitutes == 0:
             allowed_types = [{"AircraftTypeName": jet_type, "Penalty": 0}]
-        else:
+        elif substitutes > 0 and substitutes < len(allowed_tailtypes) and type(substitutes) == int:
             other_types = [t for t in allowed_tailtypes if t["AircraftTypeName"] != jet_type]
-            sampled_types = random.sample(other_types, 4)
+            sampled_types = random.sample(other_types, substitutes)
             allowed_types = [{"AircraftTypeName": jet_type, "Penalty": 0}] + sampled_types
+        else:
+            raise ValueError(f"Invalid substitutes: {substitutes}")
+
 
         # === Required FA crewmember positions ===
         big_planes = ["CL-650S", "GL5500", "CE-700", "GL6000S", "CE-680AS"]
@@ -905,14 +917,21 @@ def generate_scenario(
     baseline_count = len(requests)
     extra_requests = []
     if event:
+        EVENT_RANGE_MILES = 100
         epicenter_event = random.choice(airports)
-        event_airports = airports_inside_circle(epicenter_event, 30.0, airport_coords)
-        print(f"🎪 Event at {epicenter_event}: {len(event_airports)} airports within 30mi have surge demand")
+        event_airports = airports_inside_circle(epicenter_event, EVENT_RANGE_MILES, airport_coords)
+        Extra_request_number_standard = int(max(100, 0.05 * baseline_count))   # 10% extra requests
+        extra_request_per_airport = max(1, Extra_request_number_standard // len(event_airports))
+        Extra_request_number = extra_request_per_airport * len(event_airports)
+        print(f"🎯 Target extra requests: {Extra_request_number} (~{extra_request_per_airport} per airport)")
+        print(f"🎪 Event at {epicenter_event}: {len(event_airports)} airports within {EVENT_RANGE_MILES}mi have surge demand")
+
+        extra_count = 0
 
         # extra_requests = []
         for ea in event_airports:
         # each airport generates 10 requests
-            for j in range(10):
+            for j in range(extra_request_per_airport):
                 dep = ea
                 arr = random.choice([a for a in airports if a != dep])
                 req_time = start_time + timedelta(minutes=random.randint(0, time_window_days * 24 * 60))
@@ -931,7 +950,7 @@ def generate_scenario(
                     "requestedAircraftTypeName": jet_type,
                 })
 
-        extra_count = len(event_airports) * 10
+                extra_count += 1
         # extra_count = len(extra_requests)
         # requests += extra_requests                 
         print(f"📈 Event extra requests: {extra_count}")
@@ -966,7 +985,7 @@ def generate_scenario(
     print(f"[DEBUG] Final total legs: {len(legs)}")
 
     # === save scenario ===
-    scenario = {
+    scenario = {                # For Vivian : What is this for? scenario is defined again below
         "DOE_Factors": {
             "arrival_rate": arrival_rate,
             "substitutes": substitutes,
@@ -1028,8 +1047,8 @@ def generate_scenario(
 #     generate_scenario11_full(exp.values())
 # === Generate multiple scenarios ===
 experiments = [
-    {"arrival_rate": "low", "substitutes": 0, "tail_scale": "low", "geo_density": "high", "hub_pattern": "fly_out", "time_window_days": 1, "weather": True, "event": False, "maintenance_cycle": "low"},
-    {"arrival_rate": "high", "substitutes": 1, "tail_scale": "high", "geo_density": "low", "hub_pattern": "fly_in", "time_window_days": 1, "weather": False, "event": True, "maintenance_cycle": "high"},
+    {"arrival_rate": "low", "substitutes": 0, "tail_scale": "low", "crew_included": True, "crewmember_level": "low", "geo_density": "high", "hub_pattern": "fly_out", "time_window_days": 1, "weather": True, "event": False, "maintenance_cycle": "low"},
+    {"arrival_rate": "high", "substitutes": 4, "tail_scale": "high", "crew_included": True, "crewmember_level": "low", "geo_density": "low", "hub_pattern": "fly_in", "time_window_days": 1, "weather": False, "event": True, "maintenance_cycle": "high"},
 ]
 
 for exp in experiments:
