@@ -961,21 +961,6 @@ def generate_scenario(
     else:
         weather_legs = []
 
-    # === save scenario ===
-    scenario = {
-        "DOE_Factors": {
-            "arrival_rate": arrival_rate,
-            "substitutes": substitutes,
-            "tail_scale": tail_scale,
-            "geo_density": geo_density,
-            "time_window_days": time_window_days,
-            "weather": weather,
-            "event": event,
-            "maintenance_cycle": maintenance_cycle,
-        },
-        "Tails": tails,
-        "FlightRequests": requests,
-    }
 
     # === Scenario output ===
     scenario = {
