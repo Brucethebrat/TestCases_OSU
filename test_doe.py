@@ -917,13 +917,16 @@ def generate_scenario(
     baseline_count = len(requests)
     extra_requests = []
     if event:
+        EVENT_RANGE_MILES = 100
         epicenter_event = random.choice(airports)
-        event_airports = airports_inside_circle(epicenter_event, 30.0, airport_coords)
+        event_airports = airports_inside_circle(epicenter_event, EVENT_RANGE_MILES, airport_coords)
         Extra_request_number_standard = int(max(100, 0.05 * baseline_count))   # 10% extra requests
         extra_request_per_airport = max(1, Extra_request_number_standard // len(event_airports))
         Extra_request_number = extra_request_per_airport * len(event_airports)
         print(f"🎯 Target extra requests: {Extra_request_number} (~{extra_request_per_airport} per airport)")
-        print(f"🎪 Event at {epicenter_event}: {len(event_airports)} airports within 30mi have surge demand")
+        print(f"🎪 Event at {epicenter_event}: {len(event_airports)} airports within {EVENT_RANGE_MILES}mi have surge demand")
+
+        extra_count = 0
 
         # extra_requests = []
         for ea in event_airports:
@@ -947,7 +950,7 @@ def generate_scenario(
                     "requestedAircraftTypeName": jet_type,
                 })
 
-        extra_count = len(event_airports) * 10
+                extra_count += 1
         # extra_count = len(extra_requests)
         # requests += extra_requests                 
         print(f"📈 Event extra requests: {extra_count}")
@@ -1044,8 +1047,8 @@ def generate_scenario(
 #     generate_scenario11_full(exp.values())
 # === Generate multiple scenarios ===
 experiments = [
-    {"arrival_rate": "low", "substitutes": 0, "tail_scale": "low", "crew_include": True, "crewmember_level": "low", "geo_density": "high", "hub_pattern": "fly_out", "time_window_days": 1, "weather": True, "event": False, "maintenance_cycle": "low"},
-    {"arrival_rate": "high", "substitutes": 4, "tail_scale": "high", "crew_include": True, "crewmember_level": "low", "geo_density": "low", "hub_pattern": "fly_in", "time_window_days": 1, "weather": False, "event": True, "maintenance_cycle": "high"},
+    {"arrival_rate": "low", "substitutes": 0, "tail_scale": "low", "crew_included": True, "crewmember_level": "low", "geo_density": "high", "hub_pattern": "fly_out", "time_window_days": 1, "weather": True, "event": False, "maintenance_cycle": "low"},
+    {"arrival_rate": "high", "substitutes": 4, "tail_scale": "high", "crew_included": True, "crewmember_level": "low", "geo_density": "low", "hub_pattern": "fly_in", "time_window_days": 1, "weather": False, "event": True, "maintenance_cycle": "high"},
 ]
 
 for exp in experiments:
