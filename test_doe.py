@@ -128,6 +128,7 @@ def generate_allowed_tailtypes(allowed_tailtypes, start_time):
     night_exp = (start_time + timedelta(days=365)).strftime("%Y-%m-%dT%H:%M:%SZ")
     qual_start = (start_time + timedelta(days=-365)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
+
     for t in temp_types:
         rand_allowed_tailtypes.append({
             "AircraftTypeName": t["AircraftTypeName"],
