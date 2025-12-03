@@ -126,7 +126,7 @@ def generate_allowed_tailtypes(allowed_tailtypes, start_time):
     
     day_exp = (start_time + timedelta(days=365)).strftime("%Y-%m-%dT%H:%M:%SZ")
     night_exp = (start_time + timedelta(days=365)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    qual_start = start_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+    qual_start = (start_time + timedelta(days=-365)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     for t in temp_types:
         rand_allowed_tailtypes.append({
@@ -543,6 +543,7 @@ def generate_crew_activities(crews, airports, airport_coords, start_time, legs=[
             })
 
     return crew_activities, crew_fly_together
+
 
 
 def pick_2_random_airports_for_req(pool1, pool2):
@@ -980,25 +981,10 @@ def generate_scenario(
     else:
         weather_legs = []
 
-    print(f"[DEBUG] Crew-generated legs: {len(legs) - len(weather_legs)}")
-    print(f"[DEBUG] Weather legs: {len(weather_legs)}")
-    print(f"[DEBUG] Final total legs: {len(legs)}")
+    # print(f"[DEBUG] Crew-generated legs: {len(legs) - len(weather_legs)}")
+    # print(f"[DEBUG] Weather legs: {len(weather_legs)}")
+    # print(f"[DEBUG] Final total legs: {len(legs)}")
 
-    # === save scenario ===
-    scenario = {                # For Vivian : What is this for? scenario is defined again below
-        "DOE_Factors": {
-            "arrival_rate": arrival_rate,
-            "substitutes": substitutes,
-            "tail_scale": tail_scale,
-            "geo_density": geo_density,
-            "time_window_days": time_window_days,
-            "weather": weather,
-            "event": event,
-            "maintenance_cycle": maintenance_cycle,
-        },
-        "Tails": tails,
-        "FlightRequests": requests,
-    }
 
     # === Scenario output ===
     scenario = {
