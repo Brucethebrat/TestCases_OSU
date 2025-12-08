@@ -640,9 +640,9 @@ def generate_scenario(
     # === numerical setting ===
     tail_scale_map = {"low": 500, "high": 1000}
     num_tails = tail_scale_map[tail_scale]
-    num_requests = num_tails * (2 if arrival_rate == "low" else 4) * time_window_days
+    num_requests = int(num_tails * (2 if arrival_rate == "low" else 2.5) * time_window_days)
     
-    mx_scale_map = {"low": 0.1, "high": 0.3}
+    mx_scale_map = {"low": 0.1, "high": 0.2}
     mx_num = mx_scale_map[maintenance_scale] * num_tails * time_window_days
 
     # ====== Vivian ======
@@ -1082,7 +1082,7 @@ def generate_scenario(
     }
 
     # filename = f"scenario_{arrival_rate}_{geo_density}_{tail_scale}_{maintenance_cycle}.json"
-    filename = f"scenario_{exp_id}.json"
+    filename = f"DOE1_run{exp_id}.json"
     with open(filename, "w") as f:
         json.dump(scenario, f, indent=2)
     print()
@@ -1107,7 +1107,7 @@ substitutes_options = [0, 4]
 tail_scales = ["low", "high"]
 crewmember_levels = ["low", "high"] # "mid",
 maintenance_scales = ["low", "high"]
-maintenance_airport_distributions = ["east", "balanced"] # "west",
+maintenance_airport_distributions = ["balanced", "east"] # "west",
 geo_densities = ["low", "high"]
 hub_patterns = ["fly_out", "fly_in"] # "fly_io",
 time_window_days_options = [1, 3]
