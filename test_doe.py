@@ -569,7 +569,7 @@ def generate_scenario(
     weather=False,
     event=False,
     maintenance_cycle="low",
-    start_time=None,
+    start_time="2025-04-02T00:00:00Z",
     season="Winter",        # removed for now
     hub_pattern = "fly_out"
 ):
@@ -577,6 +577,8 @@ def generate_scenario(
     if start_time is None:
         start_time = datetime.now().replace(hour=6, minute=0, second=0, microsecond=0)
         print(f"⏰ start_time not provided → default = {start_time}")
+    elif isinstance(start_time, str):
+        start_time = datetime.strptime(start_time, "%Y-%m-%dT%H:%M:%SZ")
 
     random.seed(time.time())
 
@@ -837,7 +839,7 @@ def generate_scenario(
 
         arr = random.choice(candidate_pool)'''
 
-        req_time = start_time + timedelta(minutes=random.randint(0, time_window_days * 24 * 60))
+        req_time = start_time + timedelta(minutes=random.randint(0, time_window_days * 24 * 60 - 2))
         req_id = flightID_start + rid
         jet_type = random.choice(allowed_tailtypes)["AircraftTypeName"]
 
@@ -888,7 +890,7 @@ def generate_scenario(
     for mx_id in range(int(mx_num)):
         dep = random.choice(mx_airport)
         arr = dep
-        req_time = start_time + timedelta(minutes=random.randint(0, time_window_days * 24 * 60))
+        req_time = start_time + timedelta(minutes=random.randint(0, time_window_days * 24 * 60 - 2))
         service_time = random.randint(4, 24)*60  # maintenance time between 4 hours to 24 hours
         req_id = mxID_start + mx_id
         required_tail_obj = random.choice(tails)
@@ -935,7 +937,7 @@ def generate_scenario(
             for j in range(extra_request_per_airport):
                 dep = ea
                 arr = random.choice([a for a in airports if a != dep])
-                req_time = start_time + timedelta(minutes=random.randint(0, time_window_days * 24 * 60))
+                req_time = start_time + timedelta(minutes=random.randint(0, time_window_days * 24 * 60 - 2))
                 req_id = flightID_start + len(requests)
                 jet_type = random.choice(allowed_tailtypes)["AircraftTypeName"]
 
@@ -1033,8 +1035,9 @@ def generate_scenario(
 #     generate_scenario11_full(exp.values())
 # === Generate multiple scenarios ===
 experiments = [
-    {"arrival_rate": "low", "substitutes": 0, "tail_scale": "low", "crew_included": True, "crewmember_level": "low", "geo_density": "high", "hub_pattern": "fly_out", "time_window_days": 1, "weather": True, "event": False, "maintenance_cycle": "low"},
-    {"arrival_rate": "high", "substitutes": 4, "tail_scale": "high", "crew_included": True, "crewmember_level": "low", "geo_density": "low", "hub_pattern": "fly_in", "time_window_days": 1, "weather": False, "event": True, "maintenance_cycle": "high"},
+    {"arrival_rate": "low", "substitutes": 0, "tail_scale": "low", "crew_included": True, "crewmember_level": "low", "geo_density": "low", "hub_pattern": "fly_out", "time_window_days": 1, "weather": False, "event": False, "maintenance_cycle": "low"},
+    {"arrival_rate": "high", "substitutes": 4, "tail_scale": "high", "crew_included": True, "crewmember_level": "high", "geo_density": "high", "hub_pattern": "fly_out", "time_window_days": 1, "weather": True, "event": True, "maintenance_cycle": "high"},
+    {"arrival_rate": "low", "substitutes": 0, "tail_scale": "low", "crew_included": True, "crewmember_level": "low", "geo_density": "high", "hub_pattern": "fly_out", "time_window_days": 1, "weather": True, "event": False, "maintenance_cycle": "low"}
 ]
 
 for exp in experiments:
