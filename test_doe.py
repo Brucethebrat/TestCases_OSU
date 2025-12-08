@@ -72,6 +72,7 @@ def haversine(lat1, lon1, lat2, lon2):
     a = sin(dlat / 2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2)**2
     return R * 2 * atan2(sqrt(a), sqrt(1 - a))
 
+
 def airports_inside_circle(epicenter_icao: str, radius_miles: float,
                                       airport_coords: dict) -> set:
     """retrun epicenter radius radius_miles all affected airports in ICAO set。"""
@@ -197,26 +198,26 @@ def generate_crewmembers(crewmember_level, allowed_tailtypes, airports, start_ti
             "CrewmemberQualifications": qualified_types
         })
     
-    # ====================== Vivian ======================
-    FAnum = int(0.1 * num_crews)
+    # # ====================== Vivian ======================
+    # FAnum = int(0.1 * num_crews)
 
-    for FAid in range(1, FAnum + 1):
-        crew_id = crewID_start + num_crews + FAid     #ensure no overlap with previous section
-        roster_length = random.randint(5, 8)
-        tour_start_time = start_time + timedelta(hours=random.randint(-roster_length * 24, time_window_days * 24))
-        tour_end_time = tour_start_time + timedelta(minutes=roster_length * 24 * 60 + 13 * 60 - 1)
-        airport_domicile = random.choice(airports)
-        current_loc = airport_domicile if random.random() < 0.9 else random.choice(airports)
-        qualified_types = generate_allowed_tailtypes_FA(allowed_tailtypes)
+    # for FAid in range(1, FAnum + 1):
+    #     crew_id = crewID_start + num_crews + FAid     #ensure no overlap with previous section
+    #     roster_length = random.randint(5, 8)
+    #     tour_start_time = start_time + timedelta(hours=random.randint(-roster_length * 24, time_window_days * 24))
+    #     tour_end_time = tour_start_time + timedelta(minutes=roster_length * 24 * 60 + 13 * 60 - 1)
+    #     airport_domicile = random.choice(airports)
+    #     current_loc = airport_domicile if random.random() < 0.9 else random.choice(airports)
+    #     qualified_types = generate_allowed_tailtypes_FA(allowed_tailtypes)
 
-        crews.append({
-            "CrewmemberID": crew_id,
-            "CurrentLocation": current_loc,
-            "AirportIDDomicile": airport_domicile,
-            "tourStartDate": tour_start_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "tourEndDate": tour_end_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "CrewmemberQualifications": qualified_types
-        })
+    #     crews.append({
+    #         "CrewmemberID": crew_id,
+    #         "CurrentLocation": current_loc,
+    #         "AirportIDDomicile": airport_domicile,
+    #         "tourStartDate": tour_start_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+    #         "tourEndDate": tour_end_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+    #         "CrewmemberQualifications": qualified_types
+    #     })
 
     return crews
 
@@ -569,9 +570,10 @@ def generate_scenario(
     weather=False,
     event=False,
     maintenance_cycle="low",
-    start_time=None,
+    start_time=datetime(2025, 4, 2, 0, 0, 0),
     season="Winter",        # removed for now
-    hub_pattern = "fly_out"
+    hub_pattern = "fly_out",
+    exp_id=0
 ):
     
     if start_time is None:
@@ -602,7 +604,7 @@ def generate_scenario(
     
 
 
-    # ========== Bruce: don't need this once we have season input ==========
+    '''# ========== Bruce: don't need this once we have season input ==========
     # === derive season from time window ===
     month = start_time.month
     if month in [12, 1, 2]:
@@ -630,7 +632,7 @@ def generate_scenario(
         prob_north_bias = prob_bias
         bias_direction = "north"
 
-    print(f"🍂 Auto season={season} (month={month}): 30% bias toward {bias_direction}")
+    print(f"🍂 Auto season={season} (month={month}): 30% bias toward {bias_direction}")'''
 
 
     # === numerical setting ===
@@ -666,6 +668,13 @@ def generate_scenario(
         num_west = int(0.7 * mx_airport_num)
         selected_west = random.sample(west_airports, num_west)
         selected_east = random.sample(east_airports, num_east)
+        mx_airport = selected_east + selected_west
+
+    elif maintenance_airport_distribution == "balanced":
+        num_east = int(0.5 * mx_airport_num)
+        num_west = int(0.5 * mx_airport_num)
+        selected_east = random.sample(east_airports, num_east)
+        selected_west = random.sample(west_airports, num_west)
         mx_airport = selected_east + selected_west
 
     else:
@@ -732,6 +741,7 @@ def generate_scenario(
     legs = []
     if crew_included:
         crews = generate_crewmembers(crewmember_level, allowed_tailtypes, airports, start_time, time_window_days)
+        crewmember_count = len(crews)
         crew_activities, crew_fly_together = generate_crew_activities(crews, airports, airport_coords, start_time, legs, tails)
 
     # ====================== Bruce ======================
@@ -837,7 +847,7 @@ def generate_scenario(
 
         arr = random.choice(candidate_pool)'''
 
-        req_time = start_time + timedelta(minutes=random.randint(0, time_window_days * 24 * 60))
+        req_time = start_time + timedelta(minutes=random.randint(0, time_window_days * 24 * 60 - 2))
         req_id = flightID_start + rid
         jet_type = random.choice(allowed_tailtypes)["AircraftTypeName"]
 
@@ -888,7 +898,7 @@ def generate_scenario(
     for mx_id in range(int(mx_num)):
         dep = random.choice(mx_airport)
         arr = dep
-        req_time = start_time + timedelta(minutes=random.randint(0, time_window_days * 24 * 60))
+        req_time = start_time + timedelta(minutes=random.randint(0, time_window_days * 24 * 60 - 2))
         service_time = random.randint(4, 24)*60  # maintenance time between 4 hours to 24 hours
         req_id = mxID_start + mx_id
         required_tail_obj = random.choice(tails)
@@ -935,7 +945,7 @@ def generate_scenario(
             for j in range(extra_request_per_airport):
                 dep = ea
                 arr = random.choice([a for a in airports if a != dep])
-                req_time = start_time + timedelta(minutes=random.randint(0, time_window_days * 24 * 60))
+                req_time = start_time + timedelta(minutes=random.randint(0, time_window_days * 24 * 60 - 2))
                 req_id = flightID_start + len(requests)
                 jet_type = random.choice(allowed_tailtypes)["AircraftTypeName"]
 
@@ -986,6 +996,30 @@ def generate_scenario(
     # print(f"[DEBUG] Final total legs: {len(legs)}")
 
 
+
+    # ==================== summary ====================     # not finished yet
+    tail_count = len(tails)
+    request_count = len(requests)
+    maintenance_count = int(mx_num)
+    total_mx_minutes = sum([r.get("ServiceTime",0) for r in requests if r["ActivityType"] == "MAINTENANCE"])
+    # total_rev_flights_duration = sum([r.get("Duration",0) for r in legs if r["ActivityType"] == "OPERATE_REVENUE_FLIGHT"])
+    total_cycles_left = sum([t["CyclesLeftForNextMaintenance"] for t in tails])
+    total_minutes_left = sum([t["MinutesLeftForNextMaintenance"] for t in tails])
+    mx_minutes_by_type = {}
+    rev_minutes_by_type = {}
+    cycels_left_by_type = {}
+    minutes_left_by_type = {}
+    for fleet_type in allowed_tailtypes:
+        atype = fleet_type["AircraftTypeName"]
+        mx_minutes_by_type[atype] = sum([r.get("ServiceTime",0) for r in requests if r["ActivityType"] == "MAINTENANCE" and any(at["AircraftTypeName"]==atype for at in r["AllowedTailTypes"])])
+        # rev_minutes_by_type[atype] = sum([r.get("Duration",0) for r in legs if r["ActivityType"] == "OPERATE_REVENUE_FLIGHT" and any(at["AircraftTypeName"]==atype for at in r["AllowedTailTypes"])])
+        cycels_left_by_type[atype] = sum([t["CyclesLeftForNextMaintenance"] for t in tails if t["AircraftTypeName"] == atype])
+        minutes_left_by_type[atype] = sum([t["MinutesLeftForNextMaintenance"] for t in tails if t["AircraftTypeName"] == atype])
+
+    # ==================== summary ====================
+
+
+
     # === Scenario output ===
     scenario = {
         "Tails": tails,
@@ -1010,10 +1044,43 @@ def generate_scenario(
         },
         # ====================== Bruce ======================
         
-        "Description": "DOE Run #11 with Weather disruption",
+        "Factors": {
+            "DOE Run ID": exp_id,
+            "Area": area,
+            "Arrival Rate": arrival_rate,
+            "substitutes": substitutes,
+            "tail_scale": tail_scale,
+            "crew_included": crew_included,
+            "crewmember_level": crewmember_level,
+            "maintenance_scale": maintenance_scale,
+            "maintenance_airport_distribution": maintenance_airport_distribution,
+            "geo_density": geo_density,
+            "time_window_days": time_window_days,
+            "weather": weather,
+            "event": event,
+            "maintenance_cycle": maintenance_cycle,
+            "start_time": start_time.strftime("%Y-%m-%dT%H:%M:%SZ") if start_time else None,
+            "season": season,
+            "hub_pattern": hub_pattern
+        },
+        
+        "Summary": {        # not finished yet
+            "tail_scale": tail_count,
+            "request_count": request_count,
+            "maintenance_count": maintenance_count,
+            "crewmember_count": crewmember_count if crew_included else 0,
+            "total_maintenance_minutes": total_mx_minutes,
+            # "total_revenue_flight_minutes": total_rev_flights_duration,
+            "total_cycles_left": total_cycles_left,
+            "total_minutes_left": total_minutes_left,
+            "maintenance_minutes_by_type": mx_minutes_by_type,
+            # "revenue_flight_minutes_by_type": rev_minutes_by_type,
+            "cycles_left_by_type": cycels_left_by_type,
+        }
     }
 
-    filename = f"scenario_{arrival_rate}_{geo_density}_{tail_scale}_{maintenance_cycle}.json"
+    # filename = f"scenario_{arrival_rate}_{geo_density}_{tail_scale}_{maintenance_cycle}.json"
+    filename = f"scenario_{exp_id}.json"
     with open(filename, "w") as f:
         json.dump(scenario, f, indent=2)
     print()
@@ -1032,11 +1099,70 @@ def generate_scenario(
 # for exp in exps:
 #     generate_scenario11_full(exp.values())
 # === Generate multiple scenarios ===
-experiments = [
-    {"arrival_rate": "low", "substitutes": 0, "tail_scale": "low", "crew_included": True, "crewmember_level": "low", "geo_density": "high", "hub_pattern": "fly_out", "time_window_days": 1, "weather": True, "event": False, "maintenance_cycle": "low"},
-    {"arrival_rate": "high", "substitutes": 4, "tail_scale": "high", "crew_included": True, "crewmember_level": "low", "geo_density": "low", "hub_pattern": "fly_in", "time_window_days": 1, "weather": False, "event": True, "maintenance_cycle": "high"},
-]
 
-for exp in experiments:
-    generate_scenario(**exp)
+arrival_rates = ["low", "high"]
+substitutes_options = [0, 4]
+tail_scales = ["low", "high"]
+crewmember_levels = ["low", "high"] # "mid",
+maintenance_scales = ["low", "high"]
+maintenance_airport_distributions = ["east", "balanced"] # "west",
+geo_densities = ["low", "high"]
+hub_patterns = ["fly_out", "fly_in"] # "fly_io",
+time_window_days_options = [1, 3]
+weather_options = [False, True]
+event_options = [False, True]
+maintenance_cycles = ["low", "high"]
+
+experiments = [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 
+               [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]]  # total 12 factors
+
+
+'''experiments = [
+    {"arrival_rate": "low", 
+     "substitutes": 0, 
+     "tail_scale": "low",
+     "crewmember_level": "low", 
+     "maintenance_scale": "high",
+     "maintenance_airport_distribution": "west",
+     "geo_density": "high", 
+     "hub_pattern": "fly_out", 
+     "time_window_days": 1, 
+     "weather": True, 
+     "event": False, 
+     "maintenance_cycle": "low",
+     "experiment_id": 1},
+    {"arrival_rate": "high", 
+     "substitutes": 4, 
+     "tail_scale": "high",
+     "crewmember_level": "low", 
+     "maintenance_scale": "high",
+     "maintenance_airport_distribution": "west",
+     "geo_density": "low", 
+     "hub_pattern": "fly_in", 
+     "time_window_days": 1, 
+     "weather": False, 
+     "event": True, 
+     "maintenance_cycle": "high",
+     "experiment_id": 2},
+]'''
+
+
+
+
+for idx, exp in enumerate(experiments):
+    generate_scenario(arrival_rate=arrival_rates[exp[0]],
+                      substitutes=substitutes_options[exp[1]],
+                      tail_scale=tail_scales[exp[2]],
+                      crewmember_level=crewmember_levels[exp[3]],
+                      maintenance_scale=maintenance_scales[exp[4]],
+                      maintenance_airport_distribution=maintenance_airport_distributions[exp[5]],
+                      geo_density=geo_densities[exp[6]],
+                      hub_pattern=hub_patterns[exp[7]],
+                      time_window_days=time_window_days_options[exp[8]],
+                      weather=weather_options[exp[9]],
+                      event=event_options[exp[10]],
+                      maintenance_cycle=maintenance_cycles[exp[11]],
+                      exp_id=idx+1
+                      )
+    # generate_scenario(**exp)
     print("--------------------------------------------------")
