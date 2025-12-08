@@ -570,7 +570,7 @@ def generate_scenario(
     weather=False,
     event=False,
     maintenance_cycle="low",
-    start_time=datetime(2025, 4, 2, 0, 0, 0),
+    start_time="2025-04-02T00:00:00Z",
     season="Winter",        # removed for now
     hub_pattern = "fly_out",
     exp_id=0
@@ -579,6 +579,8 @@ def generate_scenario(
     if start_time is None:
         start_time = datetime.now().replace(hour=6, minute=0, second=0, microsecond=0)
         print(f"⏰ start_time not provided → default = {start_time}")
+    elif isinstance(start_time, str):
+        start_time = datetime.strptime(start_time, "%Y-%m-%dT%H:%M:%SZ")
 
     random.seed(time.time())
 
