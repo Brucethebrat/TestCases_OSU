@@ -170,11 +170,11 @@ def generate_crewmembers(crewmember_level, allowed_tailtypes, airports, start_ti
     crews = []
     # positions = ["PIC", "SIC"]
     if crewmember_level == "low":
-        num_crews = 1500
+        num_crews = 400
     elif crewmember_level == "mid":
-        num_crews = 2000
+        num_crews = 600
     elif crewmember_level == "high":
-        num_crews = 2500
+        num_crews = 800
     else:
         print("Invalid crewmember_level, defaulting to low (2000 crews)")
         num_crews = 2000
@@ -638,9 +638,9 @@ def generate_scenario(
 
 
     # === numerical setting ===
-    tail_scale_map = {"low": 500, "high": 1000}
+    tail_scale_map = {"low": 200, "high": 400}
     num_tails = tail_scale_map[tail_scale]
-    num_requests = int(num_tails * (2 if arrival_rate == "low" else 2.5) * time_window_days)
+    num_requests = int(num_tails * (1 if arrival_rate == "low" else 2) * time_window_days)
     
     mx_scale_map = {"low": 0.1, "high": 0.2}
     mx_num = mx_scale_map[maintenance_scale] * num_tails * time_window_days
@@ -1082,7 +1082,7 @@ def generate_scenario(
     }
 
     # filename = f"scenario_{arrival_rate}_{geo_density}_{tail_scale}_{maintenance_cycle}.json"
-    filename = f"DOE1_run{exp_id}.json"
+    filename = f"./TestCases/DOE1_run{exp_id}.json"
     with open(filename, "w") as f:
         json.dump(scenario, f, indent=2)
     print()
@@ -1103,7 +1103,7 @@ def generate_scenario(
 # === Generate multiple scenarios ===
 
 arrival_rates = ["low", "high"]
-substitutes_options = [0, 4]
+substitutes_options = [0, 2]
 tail_scales = ["low", "high"]
 crewmember_levels = ["low", "high"] # "mid",
 maintenance_scales = ["low", "high"]
@@ -1115,8 +1115,42 @@ weather_options = [False, True]
 event_options = [False, True]
 maintenance_cycles = ["low", "high"]
 
-experiments = [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 
-               [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]]  # total 12 factors
+# experiments = [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 
+#                [1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1]]  # total 12 factors
+
+# DOE experiments matrix ( 30 runs )
+experiments = [
+    [1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0], # [0, 1, 1]
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], # [0, 0, 0]
+    [1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1], # [0, 1, 0]
+    [1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0], # [1, 0, 1]
+    [1, 1, 1, 0, 1, 1, 0, 1, 0, 0, 0, 0], # [1, 1, 0]
+    [1, 1, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1], # [1, 0, 1]
+    [1, 1, 0, 1, 1, 0, 1, 1, 0, 0, 0, 1], # [0, 1, 1]
+    [1, 1, 0, 0, 0, 1, 1, 0, 0, 1, 0, 1], # [1, 1, 0]
+    [1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0], # [1, 1, 0]
+    [1, 0, 1, 1, 0, 1, 0, 1, 0, 0, 1, 1], # [0, 0, 0]
+    [1, 0, 1, 0, 1, 1, 1, 0, 0, 0, 1, 0], # [1, 1, 1]
+    [1, 0, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0], # [0, 1, 0]
+    [1, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0], # [0, 0, 1]
+    [1, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 1], # [1, 0, 0]
+    [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1], # [0, 0, 1]
+    [0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1], # [0, 0, 1]
+    [0, 1, 1, 0, 1, 0, 1, 1, 0, 0, 1, 1], # [0, 1, 1]
+    [0, 1, 1, 0, 1, 0, 1, 1, 0, 0, 1, 0], # [1, 0, 0]
+    [0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 1], # [0, 0, 1]
+    [0, 1, 0, 1, 1, 1, 1, 1, 0, 0, 1, 0], # [1, 1, 1]
+    [0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 0], # [0, 1, 0]
+    [0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1], # [1, 1, 0]
+    [0, 1, 0, 0, 0, 1, 1, 1, 0, 1, 1, 0], # [0, 0, 0]
+    [0, 0, 1, 1, 0, 1, 1, 1, 0, 0, 1, 0], # [1, 0, 0]
+    [0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0], # [1, 1, 1]
+    [0, 0, 1, 0, 1, 1, 1, 0, 0, 1, 0, 1], # [1, 0, 0]
+    [0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 1, 0], # [0, 1, 0]
+    [0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1], # [1, 1, 1]
+    [0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 0], # [0, 1, 1]
+    [0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1], # [1, 1, 1]
+]
 
 
 '''experiments = [
