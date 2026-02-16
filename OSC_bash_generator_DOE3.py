@@ -11,9 +11,9 @@ def generate_sh(idx, top_k, l_top, bucket, pool_mult, alpha_fresh, filename):
 
 cd /users/PAS2414/brucecheng/DOE3
 
-SCRIPT_PATH='run_scheduler_with1107_4OSC_grb_lic_include.py'
+SCRIPT_PATH='run_scheduler_with0202_4OSC_grb_lic_include.py'
 
-. DOE2_env/bin/activate
+. DOE3_env/bin/activate
 # module load gurobi/12.0.0
 
 python $SCRIPT_PATH {idx} {top_k_lvls[top_k]} {l_top_lvls[l_top]} {bucket_lvls[bucket]} {pool_mult_lvls[pool_mult]} {alpha_fresh_lvls[alpha_fresh]}
@@ -32,36 +32,38 @@ if __name__ == "__main__":
 
     # DOE3
     cases = [
-        [1, 0, 0, 1, 1],
         [0, 0, 0, 0, 0],
-        [0, 1, 0, 1, 0],
-        [0, 0, 1, 0, 1],
-        [0, 0, 1, 1, 0],
+        [1, 1, 1, 1, 0],
+        [1, 1, 0, 1, 0],
+        [0, 1, 1, 1, 1],
+        [0, 0, 0, 1, 0],
         [1, 1, 1, 0, 1],
-        [0, 1, 0, 1, 1],
-        [0, 1, 1, 1, 0],
-        [1, 0, 1, 1, 0],
-        [1, 1, 0, 0, 0],
-        [1, 0, 1, 1, 1],
-        [1, 0, 0, 1, 0],
-        [0, 0, 0, 0, 1],
         [0, 1, 1, 0, 0],
-        [1, 1, 0, 0, 1],
+        [0, 0, 0, 1, 1],
+        [0, 1, 1, 0, 1],
+        [1, 1, 1, 0, 0],
+        [0, 1, 0, 0, 0],
+        [1, 1, 0, 1, 1],
+        [0, 0, 1, 0, 1],
+        [1, 0, 1, 1, 0],
+        [1, 0, 0, 0, 1],
+        [1, 0, 1, 1, 0],
+        [1, 0, 1, 0, 1],
+        [0, 0, 0, 1, 1],
+        [1, 0, 0, 0, 1],
+        [1, 0, 0, 0, 0],
+        [0, 1, 1, 1, 0],
         [1, 1, 0, 0, 1],
         [1, 1, 0, 1, 1],
-        [1, 0, 1, 0, 0],
-        [0, 1, 0, 0, 1],
         [1, 0, 1, 1, 1],
-        [0, 0, 0, 1, 0],
+        [1, 1, 1, 0, 0],
         [1, 1, 1, 1, 0],
-        [1, 0, 0, 0, 0],
-        [1, 0, 1, 0, 0],
-        [0, 0, 1, 1, 1],
+        [0, 0, 1, 0, 1],
+        [0, 1, 0, 1, 0],
+        [0, 1, 0, 1, 1],
         [0, 1, 1, 0, 0],
-        [1, 0, 0, 1, 0],
-        [1, 1, 1, 1, 1],
-        [1, 0, 0, 1, 1],
-        [0, 1, 1, 1, 1]
+        [1, 1, 0, 1, 1],
+        [1, 1, 1, 0, 0]
     ]
 
     for idx, (top_k_lvl, l_top_lvl, bucket_lvl, pool_mult_lvl, alpha_fresh_lvl) in enumerate(cases):
