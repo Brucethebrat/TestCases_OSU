@@ -2,3 +2,5 @@ schedule_modified.json
 test.py
 Fine_Tune13_ver3.py
 *.sh
+DOE3_runall_high.json
+/TestCases
