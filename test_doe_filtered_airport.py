@@ -1,10 +1,13 @@
 import json
+import csv
 import random
 from datetime import datetime, timedelta
 from collections import Counter
 from math import radians, sin, cos, sqrt, atan2
 import time
 import sys
+from pathlib import Path
+import pandas as pd
 
 from Get_airport_pool import get_airport_pool
 
@@ -30,6 +33,7 @@ for a in full_data["StaticRoutingData"]["Airports"]:
 # airports_ICAO_and_coord_dict = full_data["StaticRoutingData"]["Airports"]
 # airports_ICAO_dict = [a["ICAOCode"] for a in airports_ICAO_and_coord_dict]
 
+# Filtering out the airports that are not in the real data
 routingCache = full_data["StaticRoutingData"]["RoutingCache"]
 # airports = routingCache["Airports"]
 # aircrafts = routingCache["AircraftTypeNames"]
@@ -59,12 +63,12 @@ for a_ICAO in airports:
 
 
 
-# === Step 2. define 3 hubs and distance function ===
+'''# === Step 2. define 3 hubs and distance function ===
 geo_centers = {
     "KTEB": (40.85, -74.0608),
     "KPBI": (26.6831, -80.0956),
     "KIAD": (38.9472, -77.4597)
-}
+}'''
 
 global crewID_start, flightID_start, mxID_start, tailID_start, legIDstart
 crewID_start = 700000
@@ -72,6 +76,123 @@ flightID_start = 50000
 mxID_start = 800000
 tailID_start = 1000000
 legID_start = 2000000
+
+
+
+
+def load_weighted_airport_for_Tail_Crew(csv_path: Path):
+    weighted_airports_for_tail = set()
+    weighted_airports_for_crew = set()
+    # with csv_path.open("r", encoding="utf-8", newline="") as f:
+    #     reader = csv.DictReader(f)
+    ap_df = pd.read_csv(csv_path)
+    for _, row in ap_df.iterrows():
+        airport = row["airport_name"].strip()
+        tail_count = int(row["tails_num"])
+        crew_count = int(row["crewmembers_num"])
+
+        weighted_airports_for_tail.add((airport, tail_count))
+        weighted_airports_for_crew.add((airport, crew_count))
+
+
+    # print(f"[+] Loaded {len(weighted_airports_for_tail)} weighted airports for tail from {csv_path.name}.")
+    # print(f"[+] First 5 weighted airports for tail: {list(weighted_airports_for_tail)[:5]}")
+    # print(f"[+] Loaded {len(weighted_airports_for_crew)} weighted airports for crew from {csv_path.name}.")
+    # print(f"[+] First 5 weighted airports for crew: {list(weighted_airports_for_crew)[:5]}")
+    # sys.exit()
+    return weighted_airports_for_tail, weighted_airports_for_crew   # return 2 same sets for now, can be different later if we want different distribution for tail and crew
+
+
+def load_weighted_airport_routes(csv_path: Path):
+    routes = []
+    
+    # with csv_path.open("r", encoding="utf-8", newline="") as f:
+    #     reader = csv.DictReader(f)
+    ap_df = pd.read_csv(csv_path)
+    for _, row in ap_df.iterrows():
+        airport1 = row["Airport1"].strip()
+        airport2 = row["Airport2"].strip()
+        count = int(row["TotalReservations"])
+
+        # In OD_total_3days_undirected.csv
+        # Total unique airports from combinations: 761
+        # Total unique airports from combinations with count > 1: 515
+        # Total unique airports from combinations with count > 2: 225
+        
+
+        if count <= 1:
+            continue
+        if airport1 == airport2:
+            continue
+
+        routes.append((airport1, airport2, count))
+
+    # print(f"[+] Loaded {len(routes)} weighted routes from {csv_path.name}.")
+    # print(f"first 5 routes: {routes[:5]}")
+    # sys.exit()
+    return routes
+
+
+weighted_routes_csv_path = Path(__file__).resolve().parent / "RealData" / "OD_total_3days_undirected.csv"
+weighted_airport_routes = load_weighted_airport_routes(weighted_routes_csv_path)
+
+weighted_airport_tail_csv_path = Path(__file__).resolve().parent / "RealData" / "airport_supply_demand_0218.csv"
+weighted_airports_for_tail, weighted_airports_for_crew = load_weighted_airport_for_Tail_Crew(weighted_airport_tail_csv_path)
+
+
+def pick_2_random_airports_for_req(pool1, pool2, weighted_airport_routes=[], use_real_route=False):
+    if use_real_route:
+        pool1_set = set(pool1)
+        pool2_set = set(pool2)
+
+        eligible_routes = []
+        eligible_weights = []
+
+        for a1, a2, count in weighted_airport_routes:
+            '''forward_ok = (a1 in pool1_set and a2 in pool2_set)
+            reverse_ok = (a2 in pool1_set and a1 in pool2_set)
+
+            if forward_ok and reverse_ok:
+                eligible_routes.append((a1, a2))
+                eligible_weights.append(count)
+                eligible_routes.append((a2, a1))
+                eligible_weights.append(count)
+            elif forward_ok:
+                eligible_routes.append((a1, a2))
+                eligible_weights.append(count)
+            elif reverse_ok:
+                eligible_routes.append((a2, a1))
+                eligible_weights.append(count)'''
+
+            eligible_routes.append((a1, a2))
+            eligible_weights.append(count)
+            eligible_routes.append((a2, a1))
+            eligible_weights.append(count)
+
+        if eligible_routes:
+            return random.choices(eligible_routes, weights=eligible_weights, k=1)[0]
+    else:
+        dep = random.choice(pool1)
+        arr = random.choice(pool2)
+        while arr == dep:
+            arr = random.choice(pool2)
+    return dep, arr
+
+
+def pick_weighted_random_airport(pool, weighted_airports):
+    pool_set = set(pool)
+    eligible_airports = []
+    eligible_weights = []
+
+    for airport, weight in weighted_airports:
+        if airport in pool_set:
+            eligible_airports.append(airport)
+            eligible_weights.append(weight)
+
+    if eligible_airports:
+        return random.choices(eligible_airports, weights=eligible_weights, k=1)[0]
+    else:
+        return random.choice(pool)
 
 
 
@@ -179,7 +300,7 @@ def generate_allowed_tailtypes_FA(allowed_tailtypes):
     return rand_allowed_tailtypes
 
 # ====================== Bruce ======================
-def generate_crewmembers(crewmember_level, allowed_tailtypes, airports, start_time, time_window_days):
+def generate_crewmembers(crewmember_level, allowed_tailtypes, real_route_level, airports, start_time, time_window_days):
     crews = []
     # positions = ["PIC", "SIC"]
     if crewmember_level == "low":
@@ -198,7 +319,10 @@ def generate_crewmembers(crewmember_level, allowed_tailtypes, airports, start_ti
         # Start time is randomly set within the time window minus the roster length
         tour_start_time = start_time + timedelta(hours=random.randint(-roster_length * 24, time_window_days * 24))
         tour_end_time = tour_start_time + timedelta(minutes=roster_length * 24 * 60 + 13 * 60 - 1)      # add 13 hours because found schedule_sanitized crew pattern
-        airport_domicile = random.choice(airports)
+        if real_route_level == "high":
+            airport_domicile = pick_weighted_random_airport(airports, weighted_airports_for_crew)
+        else:
+            airport_domicile = random.choice(airports)
         current_loc = airport_domicile if random.random() < 0.9 else random.choice(airports)
         qualified_types = generate_allowed_tailtypes(allowed_tailtypes, start_time)
 
@@ -560,12 +684,6 @@ def generate_crew_activities(crews, airports, airport_coords, start_time, legs=[
 
 
 
-def pick_2_random_airports_for_req(pool1, pool2):
-    dep = random.choice(pool1)
-    arr = random.choice(pool2)
-    while arr == dep:
-        arr = random.choice(pool2)
-    return dep, arr
 
 
 # === DOE factors ===
@@ -578,7 +696,9 @@ def generate_scenario(
     crewmember_level = "low",      # low / mid / high = 1500 / 2000 / 2500 crews
     maintenance_scale="low",
     maintenance_airport_distribution ="east",
-    geo_density="low",
+    # geo_density="low",
+    real_route_level="high",     # low: random route; high: weighted route based on real data # controdict with geo_density
+    round_trip_ratio=0.2,          # only for real_route_level = high, % of routes that are round trip
     time_window_days=1,
     weather=False,
     event=False,
@@ -706,14 +826,14 @@ def generate_scenario(
     north_airports = [icao for icao, (lat, lon) in airport_coords.items() if lat > 37]
     south_airports = [icao for icao, (lat, lon) in airport_coords.items() if lat <= 37]
 
-    # === Step 3. select airports based on geo_density ===
-    nearby_airports = []
-    for cname, (clat, clon) in geo_centers.items():
-        for icao, (alat, alon) in airport_coords.items():
-            if haversine(clat, clon, alat, alon) <= 50:
-                nearby_airports.append(icao)
-    print(f"🗺️ Found {len(nearby_airports)} airports within 50 miles of 3 hubs.")
-        # 🌍 10% of airports concentrated near hubs, remaining are randomly choose 
+    # # === Step 3. select airports based on geo_density ===
+    # nearby_airports = []
+    # for cname, (clat, clon) in geo_centers.items():
+    #     for icao, (alat, alon) in airport_coords.items():
+    #         if haversine(clat, clon, alat, alon) <= 50:
+    #             nearby_airports.append(icao)
+    # print(f"🗺️ Found {len(nearby_airports)} airports within 50 miles of 3 hubs.")
+    #     # 🌍 10% of airports concentrated near hubs, remaining are randomly choose 
     
         
 
@@ -755,7 +875,7 @@ def generate_scenario(
     tails = []
     legs = []
     if crew_included:
-        crews = generate_crewmembers(crewmember_level, allowed_tailtypes, airports, start_time, time_window_days)
+        crews = generate_crewmembers(crewmember_level, allowed_tailtypes, real_route_level, airports, start_time, time_window_days)
         crewmember_count = len(crews)
         crew_activities, crew_fly_together = generate_crew_activities(crews, airports, airport_coords, start_time, legs, tails)
 
@@ -768,12 +888,18 @@ def generate_scenario(
     for i in range(len(tails), num_tails):
         chosen_type = random.choice(allowed_tailtypes)["AircraftTypeName"]
         tail_number = str(tailID_start + i)
+
+        if real_route_level == "high":
+            current_loc = pick_weighted_random_airport(airports, weighted_airports_for_tail)
+        elif real_route_level == "low":
+            current_loc = random.choice(airports)
+
         tails.append({
             "TailNumber": tail_number,
             "AircraftTypeName": chosen_type,
             # "OriginalAircraftTypeName": chosen_type,
             "AvailableTime": (start_time - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ"),        # modify to random, or make it difficult to schedule
-            "CurrentLocation": random.choice(airports),
+            "CurrentLocation": current_loc,
             # "BeginTimeForNextMaintenanceAfterPlanningHorizon": "2026-04-01T09:26:48Z",
             "AssignedProperties": [
                 tail_number, chosen_type
@@ -801,22 +927,35 @@ def generate_scenario(
     # === generate flight requests ===
     requests = []
     base_dep_counter = Counter() 
+    num_hub_reqs = 0
+    num_random_reqs = num_requests
 
-    if geo_density == "high":
-        num_hub_reqs = int(0.1 * num_requests)
-        num_random_reqs = num_requests - num_hub_reqs
-        print(f"📍 High density mode: {num_hub_reqs} requests near hubs, {num_random_reqs} random across US.")
-    elif "low":        
-        num_hub_reqs = 0
-        num_random_reqs = num_requests
-        print(f"🌎 Low density mode: All {num_random_reqs} requests randomly distributed across US.")
-    else:
-        raise ValueError(f"Invalid geo_density: {geo_density}")
+    # if geo_density == "high":
+    #     num_hub_reqs = int(0.1 * num_requests)
+    #     num_random_reqs = num_requests - num_hub_reqs
+    #     print(f"📍 High density mode: {num_hub_reqs} requests near hubs, {num_random_reqs} random across US.")
+    # elif geo_density == "low":        
+    #     num_hub_reqs = 0
+    #     num_random_reqs = num_requests
+    #     print(f"🌎 Low density mode: All {num_random_reqs} requests randomly distributed across US.")
+    # else:
+    #     raise ValueError(f"Invalid geo_density: {geo_density}")
     
-    print(f"🧭 Hub traffic pattern: {hub_pattern}")
+    # print(f"🧭 Hub traffic pattern: {hub_pattern}")
 
-    for rid in range(1, num_requests + 1):
-        # --- Determine if request belongs to hub or random region ---
+    if real_route_level == "high":
+        print(f"🛫 Route pattern: HIGH realism based on real weighted routes.")
+        # real_route_counter = 0
+        REAL_ROUTE_PERCENTAGE = 0.9   # 90% requests follow real route distribution, 10% are random
+
+    elif real_route_level == "low":
+        print(f"🛫 Route pattern: LOW realism with random routes.")
+
+    rid = 0
+    adjustable_num_requests = num_requests
+    # for rid in range(1, num_requests + 1):
+    while len(requests) < adjustable_num_requests:
+        '''# --- Determine if request belongs to hub or random region ---
         is_hub_request = (geo_density == "high" and rid <= num_hub_reqs and nearby_airports)
 
         # --- Generate departure & arrival based on hub pattern ---
@@ -838,11 +977,15 @@ def generate_scenario(
                     dep, arr = random.sample(nearby_airports,2)
                     
             else:
-                raise ValueError(f"Invalid hub_pattern: {hub_pattern}")
+                raise ValueError(f"Invalid hub_pattern: {hub_pattern}")'''
 
-        else:
-            # Random region (low density or 10% random in high density)
-            arr, dep = pick_2_random_airports_for_req(airports, airports)
+        rid += 1
+        # else:
+        # Random region (low density or 10% random in high density)
+        if real_route_level == "high" and rid < adjustable_num_requests * REAL_ROUTE_PERCENTAGE:
+            arr, dep = pick_2_random_airports_for_req(airports, airports, weighted_airport_routes, use_real_route=True)
+        elif real_route_level == "low":
+            arr, dep = pick_2_random_airports_for_req(airports, airports, use_real_route=False)
 
         '''Season conflict with geo density, skip for now, fix in future version
         # === choose arrival airport with seasonal bias ===
@@ -907,6 +1050,25 @@ def generate_scenario(
         requests.append(req)
         base_dep_counter[dep] += 1
 
+        if round_trip_ratio > 0 and random.random() < round_trip_ratio:
+            # generate a return request with same dep/arr reversed, same jet type, within the time window
+            return_req_time = req_time + timedelta(hours=random.randint(1, 6))
+            if return_req_time < start_time + timedelta(days=time_window_days):
+                rid += 1
+                return_req_id = flightID_start + rid
+                return_req = {
+                    "RequestID": return_req_id,
+                    "ArrivalAirport": dep,
+                    "DepartureAirport": arr,
+                    "ActivityType": "OPERATE_REVENUE_FLIGHT",
+                    "RequestedTime": return_req_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "RequiredCrewmemberPositions": crewmember_req,
+                    "AllowedTailTypes": allowed_types,
+                    "requestedAircraftTypeName": jet_type,
+                    "TailRequiredProperties": []
+                }
+                requests.append(return_req)
+                base_dep_counter[arr] += 1
 
 
     # === generate mx requests ===
@@ -1070,7 +1232,7 @@ def generate_scenario(
             "crewmember_level": crewmember_level,
             "maintenance_scale": maintenance_scale,
             "maintenance_airport_distribution": maintenance_airport_distribution,
-            "geo_density": geo_density,
+            # "geo_density": geo_density,
             "time_window_days": time_window_days,
             "weather": weather,
             "event": event,
@@ -1122,7 +1284,8 @@ tail_scales = ["low", "high"]
 crewmember_levels = ["low", "high"] # "mid",
 maintenance_scales = ["low", "high"]
 maintenance_airport_distributions = ["balanced", "east"] # "west",
-geo_densities = ["low", "high"]
+# geo_densities = ["low", "high"]
+real_route_levels = ["low", "high"]
 hub_patterns = ["fly_out", "fly_in"] # "fly_io",
 time_window_days_options = [1, 3]
 weather_options = [False, True]
@@ -1261,7 +1424,8 @@ for idx, exp in enumerate(experiments):
                       crewmember_level=crewmember_levels[exp[3]],
                       maintenance_scale=maintenance_scales[exp[4]],
                     #   maintenance_airport_distribution=maintenance_airport_distributions[exp[5]],
-                      geo_density=geo_densities[exp[5]],
+                    #   geo_density=geo_densities[exp[5]],
+                    #   real_route_level=real_route_levels[exp[5]],
                       hub_pattern=hub_patterns[exp[6]],
                     #   time_window_days=time_window_days_options[exp[7]],
                       weather=weather_options[exp[7]],

@@ -9,8 +9,8 @@ def parse(input_str):
 
 schedule_file = [
     "./RealData/schedule_LikeOrUpgrade02-18-2026Input.json",
-    # "./RealData/schedule_LikeOrUpgrade02-16-2026Input.json",
-    # "./RealData/schedule_sanitized.json"
+    "./RealData/schedule_LikeOrUpgrade02-16-2026Input.json",
+    "./RealData/schedule_sanitized.json"
 ]
 
 def get_airport_pool(schedule_file=schedule_file):
