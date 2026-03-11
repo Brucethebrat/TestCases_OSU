@@ -1098,7 +1098,8 @@ def generate_scenario(
 
         arr = random.choice(candidate_pool)'''
 
-        planning_begin = start_time - timedelta(days=1)
+        # any start_time within the day, it will start the previous day 17:00, ends 7:59 the day after
+        planning_begin = (start_time - timedelta(days=1))).replace(hour=17, minute=0, second=0)
         planning_end = (start_time + timedelta(days=time_window_days)).replace(hour=7, minute=59, second=0)
         req_time = pick_request_time_from_hour_profile(
         start_time=start_time,
