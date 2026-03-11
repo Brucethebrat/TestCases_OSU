@@ -4,3 +4,9 @@ Fine_Tune13_ver3.py
 *.sh
 DOE3_runall_high.json
 /TestCases
+/hourly_counts_output
+__pycache__/Get_airport_pool.cpython-311.pyc
+__pycache__/Get_airport_pool.cpython-311.pyc
+__pycache__/Get_airport_pool.cpython-311.pyc
+/__pycache__
+/__pycache__
