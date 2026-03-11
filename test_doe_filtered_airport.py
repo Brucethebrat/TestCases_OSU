@@ -133,11 +133,52 @@ def load_weighted_airport_routes(csv_path: Path):
     return routes
 
 
+def load_hourly_request_profile(csv_path: Path, sample_date=None):
+    df = pd.read_csv(csv_path)
+
+    # Hour chage to datetime
+    df["Hour"] = pd.to_datetime(df["Hour"], utc=True)
+
+    df["SampleDate"] = df["Hour"].dt.date
+    df["HourOfDay"] = df["Hour"].dt.hour
+
+    # choose the day contains 24 bins
+    day_summary = (
+        df.groupby("SampleDate")
+          .agg(num_hours=("HourOfDay", "nunique"),
+               total_requests=("ReservationCount", "sum"))
+          .reset_index()
+    )
+
+    full_days = day_summary[day_summary["num_hours"] == 24].copy()
+
+    if sample_date is None:
+        if not full_days.empty:
+            chosen_date = full_days.sort_values("total_requests", ascending=False).iloc[0]["SampleDate"]
+        else:
+            chosen_date = day_summary.sort_values("total_requests", ascending=False).iloc[0]["SampleDate"]
+    else:
+        chosen_date = pd.to_datetime(sample_date).date()
+
+    day_df = df[df["SampleDate"] == chosen_date].copy()
+
+    # ensure 0~23 are exist
+    hour_counts = {h: 0 for h in range(24)}
+    for _, row in day_df.iterrows():
+        hour_counts[int(row["HourOfDay"])] = int(row["ReservationCount"])
+
+    print(f"[+] Using hourly request profile from sample date: {chosen_date}")
+    return hour_counts
+
+
 weighted_routes_csv_path = Path(__file__).resolve().parent / "RealData" / "OD_total_3days_undirected.csv"
 weighted_airport_routes = load_weighted_airport_routes(weighted_routes_csv_path)
 
 weighted_airport_tail_csv_path = Path(__file__).resolve().parent / "RealData" / "airport_supply_demand_0218.csv"
 weighted_airports_for_tail, weighted_airports_for_crew = load_weighted_airport_for_Tail_Crew(weighted_airport_tail_csv_path)
+
+hourly_profile_csv_path = Path(__file__).resolve().parent / "RealData" / "hourly_reservation_counts_021826.csv"
+hourly_request_profile = load_hourly_request_profile(hourly_profile_csv_path)
 
 
 def pick_2_random_airports_for_req(pool1, pool2, weighted_airport_routes=[], use_real_route=False):
@@ -193,6 +234,33 @@ def pick_weighted_random_airport(pool, weighted_airports):
         return random.choices(eligible_airports, weights=eligible_weights, k=1)[0]
     else:
         return random.choice(pool)
+    
+
+def pick_request_time_from_hour_profile(start_time, time_window_days, hourly_profile):
+    """
+    start_time: datetime, e.g. 2025-04-02 00:00:00
+    hourly_profile: {0: count0, 1: count1, ..., 23: count23}
+    """
+    if time_window_days != 1:
+        pass
+
+    hours = list(hourly_profile.keys())
+    weights = list(hourly_profile.values())
+  
+    if sum(weights) == 0:
+        chosen_hour = random.randint(0, 23)
+    else:
+        chosen_hour = random.choices(hours, weights=weights, k=1)[0]
+
+    chosen_minute = random.randint(0, 59)
+    chosen_second = random.randint(0, 59)
+
+    req_time = start_time.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(
+        hours=chosen_hour,
+        minutes=chosen_minute,
+        seconds=chosen_second
+    )
+    return req_time
 
 
 
@@ -1005,7 +1073,7 @@ def generate_scenario(
 
         arr = random.choice(candidate_pool)'''
 
-        req_time = start_time + timedelta(minutes=random.randint(0, time_window_days * 24 * 60 - 2))
+        req_time = pick_request_time_from_hour_profile(start_time, time_window_days, hourly_request_profile)
         req_id = flightID_start + rid
         jet_type = random.choice(allowed_tailtypes)["AircraftTypeName"]
 
