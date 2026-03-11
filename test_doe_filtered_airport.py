@@ -300,9 +300,10 @@ def generate_allowed_tailtypes_FA(allowed_tailtypes):
     return rand_allowed_tailtypes
 
 # ====================== Bruce ======================
-def generate_crewmembers(crewmember_level, allowed_tailtypes, real_route_level, airports, start_time, time_window_days):
+def generate_crewmembers(num_crews, allowed_tailtypes, real_route_level, airports, start_time, time_window_days):
+    num_crews = int(num_crews)
     crews = []
-    # positions = ["PIC", "SIC"]
+    '''positions = ["PIC", "SIC"]
     if crewmember_level == "low":
         num_crews = 800
     elif crewmember_level == "mid":
@@ -311,8 +312,8 @@ def generate_crewmembers(crewmember_level, allowed_tailtypes, real_route_level, 
         num_crews = 1200
     else:
         print("Invalid crewmember_level, defaulting to low (2000 crews)")
-        num_crews = 2000
-    
+        num_crews = 2000'''
+
     for cid in range(1, num_crews + 1):
         crew_id = crewID_start + cid
         roster_length = random.randint(5,8) # days
@@ -875,7 +876,8 @@ def generate_scenario(
     tails = []
     legs = []
     if crew_included:
-        crews = generate_crewmembers(crewmember_level, allowed_tailtypes, real_route_level, airports, start_time, time_window_days)
+        num_crewmembers = num_tails * {"low": 2.2, "high": 2.8}[crewmember_level]
+        crews = generate_crewmembers(num_crewmembers, allowed_tailtypes, real_route_level, airports, start_time, time_window_days)
         crewmember_count = len(crews)
         crew_activities, crew_fly_together = generate_crew_activities(crews, airports, airport_coords, start_time, legs, tails)
 
