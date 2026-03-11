@@ -9,12 +9,14 @@ def parse(input_str):
 
 schedule_file = [
     "./RealData/schedule_LikeOrUpgrade02-18-2026Input.json",
-    "./RealData/schedule_LikeOrUpgrade02-16-2026Input.json",
-    "./RealData/schedule_sanitized.json"
+    # "./RealData/schedule_LikeOrUpgrade02-16-2026Input.json",
+    # "./RealData/schedule_sanitized.json"
 ]
 
 def get_airport_pool(schedule_file=schedule_file):
-
+    print("[+] Getting airport pool from schedule file.")
+    for file in schedule_file:
+        print(f"    - {file}")    
     ac_type_names = ["CE-680AS", "GL5000S", "CE-700", "CL-650S", "CL-350S", "CE-680", "CE-560XLS", "EMB-505S", "EMB-505E", "EMB-545-MOD", "GL6000S", "GL7500", "GL5500"]
 
     fleet_seed_airports = set()
@@ -83,5 +85,11 @@ def get_airport_pool(schedule_file=schedule_file):
     return fleet_seed_airports
 
 if __name__ == "__main__":
-    print(get_airport_pool())
-    print(f"Total number of airports in the pool: {len(get_airport_pool())}")
+    airport_pool = get_airport_pool()
+    print(airport_pool)
+    print(f"Total number of airports in the pool: {len(airport_pool)}")
+    # check if "KSLE" is in the pool    
+    if "KSLE" in airport_pool:
+        print("KSLE is in the airport pool.")
+    else:
+        print("KSLE is NOT in the airport pool.")
