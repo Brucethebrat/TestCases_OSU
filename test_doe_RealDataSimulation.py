@@ -249,7 +249,7 @@ def pick_weighted_random_airport(pool, weighted_airports):
 
 
 
-def pick_request_time_from_hour_profile(start_time, horizon_begin, horizon_end, hourly_profile):
+def pick_request_time_from_hour_profile(horizon_begin, horizon_end, hourly_profile):
     """
     In planning horizon, based on 24-slot hourly profile sample request time.
     """
@@ -1099,13 +1099,12 @@ def generate_scenario(
         arr = random.choice(candidate_pool)'''
 
         # any start_time within the day, it will start the previous day 17:00, ends 7:59 the day after
-        planning_begin = (start_time - timedelta(days=1))).replace(hour=17, minute=0, second=0)
+        planning_begin = (start_time - timedelta(days=1)).replace(hour=17, minute=0, second=0)
         planning_end = (start_time + timedelta(days=time_window_days)).replace(hour=7, minute=59, second=0)
         req_time = pick_request_time_from_hour_profile(
-        start_time=start_time,
-        horizon_begin=planning_begin,
-        horizon_end=planning_end,
-        hourly_profile=hourly_request_profile
+            horizon_begin=planning_begin,
+            horizon_end=planning_end,
+            hourly_profile=hourly_request_profile
         )
         req_id = flightID_start + rid
         jet_type = random.choice(allowed_tailtypes)["AircraftTypeName"]
@@ -1317,11 +1316,8 @@ def generate_scenario(
         "CrewFlyingTogether": crew_fly_together if crew_included else [],
         "Configuration": {
             "PlanningHorizon": {
-                "BeginTime": (start_time + timedelta(days=-1)).strftime("%Y-%m-%dT%H:%M:%SZ"),  # positioning start 1 day before
-                "EndTime": (
-                    start_time
-                    + timedelta(days=time_window_days)
-                ).replace(hour=7, minute=59, second=0).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "BeginTime": planning_begin.strftime("%Y-%m-%dT%H:%M:%SZ"),  # positioning start 1 day before
+                "EndTime": planning_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
             }
         },
         # ====================== Bruce ======================
