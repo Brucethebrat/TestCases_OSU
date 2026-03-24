@@ -1,4 +1,7 @@
 # this file is branched from test_doe_filter_airport.py, but the airport pool will be filtered by RoutingCache
+# 0 to 0 : to make a difference between 17 to 8 scenario, start time is 00:00 on the start date, and end time 23:59 on the same day (24 hrs window)
+# But maybe we should just change the windowdays to 39 hrs and start planning time to 17:00 the day before, 
+# to make it easier to code and make changes in the future
 
 
 
@@ -94,7 +97,7 @@ legID_start = 2000000
 
 
 weighted_routes_csv_path = Path(__file__).resolve().parent / "RealData" / "OD_total_0218_undirected.csv"
-weighted_airport_tail_csv_path = Path(__file__).resolve().parent / "RealData" / "airport_supply_demand_0218.csv"
+weighted_airport_TailCrew_csv_path = Path(__file__).resolve().parent / "RealData" / "airport_supply_demand_0218.csv"
 
 
 
@@ -151,40 +154,12 @@ def load_weighted_airport_routes(csv_path: Path):
     return routes
 
 
-def load_hourly_request_profile(csv_path: Path):
-    df = pd.read_csv(csv_path)
-
-    # Hour -> datetime
-    df["Hour"] = pd.to_datetime(df["Hour"], utc=True)
-    df["HourOfDay"] = df["Hour"].dt.hour
-
-    # take average hour-of-day requests
-    hourly_avg = (
-        df.groupby("HourOfDay")["ReservationCount"]
-          .mean()
-          .round()
-          .astype(int)
-          .to_dict()
-    )
-
-    # ensure contains 0~23 
-    hour_counts = {h: 0 for h in range(24)}
-    hour_counts.update(hourly_avg)
-
-    # print("[+] Using averaged 24-slot hourly request profile")
-    for h in range(24):
-        print(f"    Hour {h:02d}: {hour_counts[h]}")
-
-    return hour_counts
-
-
 weighted_airport_routes = load_weighted_airport_routes(weighted_routes_csv_path)
 
-weighted_airports_for_tail, weighted_airports_for_crew = load_weighted_airport_for_Tail_Crew(weighted_airport_tail_csv_path)
+weighted_airports_for_tail, weighted_airports_for_crew = load_weighted_airport_for_Tail_Crew(weighted_airport_TailCrew_csv_path)
 
 
-hourly_profile_csv_path = Path(__file__).resolve().parent / "RealData" / "hourly_reservation_counts_021826.csv"
-hourly_request_profile = load_hourly_request_profile(hourly_profile_csv_path)
+
 
 
 
@@ -246,44 +221,6 @@ def pick_weighted_random_airport(pool, weighted_airports):
         return random.choices(eligible_airports, weights=eligible_weights, k=1)[0]
     else:
         return random.choice(pool)
-
-
-
-def pick_request_time_from_hour_profile(horizon_begin, horizon_end, hourly_profile):
-    """
-    In planning horizon, based on 24-slot hourly profile sample request time.
-    """
-    # generate horizon each hour slot
-    candidate_hours = []
-    candidate_weights = []
-
-    current = horizon_begin.replace(minute=0, second=0, microsecond=0)
-    if current < horizon_begin:
-        current += timedelta(hours=1)
-
-    while current <= horizon_end:
-        candidate_hours.append(current)
-        candidate_weights.append(hourly_profile.get(current.hour, 0))
-        current += timedelta(hours=1)
-
-    if not candidate_hours:
-        return horizon_begin
-
-    if sum(candidate_weights) == 0:
-        chosen_hour_start = random.choice(candidate_hours)
-    else:
-        chosen_hour_start = random.choices(candidate_hours, weights=candidate_weights, k=1)[0]
-
-    chosen_minute = random.randint(0, 59)
-    chosen_second = random.randint(0, 59)
-
-    req_time = chosen_hour_start + timedelta(minutes=chosen_minute, seconds=chosen_second)
-
-    # ensure not exceed horizon end
-    if req_time > horizon_end:
-        req_time = horizon_end - timedelta(seconds=random.randint(0, 59))
-
-    return req_time
 
 
 
@@ -792,14 +729,21 @@ def generate_scenario(
     real_route_level="high",     # low: random route; high: weighted route based on real data # controdict with geo_density
     round_trip_ratio=0.2,          # only for real_route_level = high, % of routes that are round trip
     time_window_days=1,
+    Real_planning_horizon_hours = False,
+    # time_window_total_hours = 39,
     weather=False,
     event=False,
     maintenance_cycle="low",
-    start_time="2026-02-18T17:00:00Z",
+    start_time="2026-02-18T00:00:00Z",
+    # start_time="2026-02-17T17:00:00Z",
     season="Winter",        # removed for now
     hub_pattern = "fly_out",
     exp_id=0
 ):
+    if Real_planning_horizon_hours:
+        start_time = (datetime.strptime(start_time, "%Y-%m-%dT%H:%M:%SZ") + timedelta(days=-1)).replace(hour=17, minute=0, second=0, microsecond=0)
+    
+    
     
     if start_time is None:
         start_time = datetime.now().replace(hour=6, minute=0, second=0, microsecond=0)
@@ -1098,14 +1042,7 @@ def generate_scenario(
 
         arr = random.choice(candidate_pool)'''
 
-        # any start_time within the day, it will start the previous day 17:00, ends 7:59 the day after
-        planning_begin = (start_time - timedelta(days=1)).replace(hour=17, minute=0, second=0)
-        planning_end = (start_time + timedelta(days=time_window_days)).replace(hour=7, minute=59, second=0)
-        req_time = pick_request_time_from_hour_profile(
-            horizon_begin=planning_begin,
-            horizon_end=planning_end,
-            hourly_profile=hourly_request_profile
-        )
+        req_time = start_time + timedelta(minutes=random.randint(0, time_window_days * 24 * 60 - 2))
         req_id = flightID_start + rid
         jet_type = random.choice(allowed_tailtypes)["AircraftTypeName"]
 
@@ -1316,8 +1253,8 @@ def generate_scenario(
         "CrewFlyingTogether": crew_fly_together if crew_included else [],
         "Configuration": {
             "PlanningHorizon": {
-                "BeginTime": planning_begin.strftime("%Y-%m-%dT%H:%M:%SZ"),  # positioning start 1 day before
-                "EndTime": planning_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "BeginTime": (start_time + timedelta(days=-1)).strftime("%Y-%m-%dT%H:%M:%SZ"),  # positioning start 1 day before
+                "EndTime": (start_time + timedelta(days=time_window_days)).strftime("%Y-%m-%dT%H:%M:%SZ"),
             }
         },
         # ====================== Bruce ======================
@@ -1358,7 +1295,7 @@ def generate_scenario(
     }
 
     # filename = f"scenario_{arrival_rate}_{geo_density}_{tail_scale}_{maintenance_cycle}.json"
-    filename = f"./TestCases/DOE_FilterAirport/DOE_run{exp_id}.json"
+    filename = f"./TestCases/DOE_RealDataSimulation_0to0/DOE_run{exp_id}.json"
     with open(filename, "w") as f:
         json.dump(scenario, f, indent=2)
     print()
