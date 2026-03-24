@@ -250,14 +250,14 @@ def airports_inside_circle(epicenter_icao: str, radius_miles: float,
 # ====season factor====
 
 def build_grounding_legs_for_tails(tails: list, affected_airports: set,
-                                   start_time_dt, time_window_days: int,
+                                   start_time_dt, time_window_total_hours: int,
                                    starting_leg_id: int = 10_000_000) -> list:
     """
     Create locked leg covering the entire planning window for all tails whose CurrentLocation is in affected_airports.
     Return the newly added legs.
     """
     legs = []
-    dur_minutes = time_window_days * 24 * 60
+    dur_minutes = time_window_total_hours * 60
     start_iso = start_time_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     leg_id = starting_leg_id
@@ -328,7 +328,7 @@ def generate_allowed_tailtypes_FA(allowed_tailtypes):
     return rand_allowed_tailtypes
 
 # ====================== Bruce ======================
-def generate_crewmembers(num_crews, allowed_tailtypes, real_route_level, airports, start_time, time_window_days):
+def generate_crewmembers(num_crews, allowed_tailtypes, real_route_level, airports, start_time, time_window_total_hours):
     num_crews = int(num_crews)
     crews = []
     '''positions = ["PIC", "SIC"]
@@ -346,7 +346,7 @@ def generate_crewmembers(num_crews, allowed_tailtypes, real_route_level, airport
         crew_id = crewID_start + cid
         roster_length = random.randint(5,8) # days
         # Start time is randomly set within the time window minus the roster length
-        tour_start_time = start_time + timedelta(hours=random.randint(-roster_length * 24, time_window_days * 24))
+        tour_start_time = start_time + timedelta(hours=random.randint(-roster_length * 24, time_window_total_hours))
         tour_end_time = tour_start_time + timedelta(minutes=roster_length * 24 * 60 + 13 * 60 - 1)      # add 13 hours because found schedule_sanitized crew pattern
         if real_route_level == "high":
             airport_domicile = pick_weighted_random_airport(airports, weighted_airports_for_crew)
@@ -370,7 +370,7 @@ def generate_crewmembers(num_crews, allowed_tailtypes, real_route_level, airport
     # for FAid in range(1, FAnum + 1):
     #     crew_id = crewID_start + num_crews + FAid     #ensure no overlap with previous section
     #     roster_length = random.randint(5, 8)
-    #     tour_start_time = start_time + timedelta(hours=random.randint(-roster_length * 24, time_window_days * 24))
+    #     tour_start_time = start_time + timedelta(hours=random.randint(-roster_length * 24, time_window_total_hours))
     #     tour_end_time = tour_start_time + timedelta(minutes=roster_length * 24 * 60 + 13 * 60 - 1)
     #     airport_domicile = random.choice(airports)
     #     current_loc = airport_domicile if random.random() < 0.9 else random.choice(airports)
@@ -728,9 +728,9 @@ def generate_scenario(
     # geo_density="low",
     real_route_level="high",     # low: random route; high: weighted route based on real data # controdict with geo_density
     round_trip_ratio=0.2,          # only for real_route_level = high, % of routes that are round trip
-    time_window_days=1,
     Real_planning_horizon_hours = False,
-    # time_window_total_hours = 39,
+    # time_window_days=1,
+    time_window_total_hours = 39,
     weather=False,
     event=False,
     maintenance_cycle="low",
@@ -742,7 +742,12 @@ def generate_scenario(
 ):
     if Real_planning_horizon_hours:
         start_time = (datetime.strptime(start_time, "%Y-%m-%dT%H:%M:%SZ") + timedelta(days=-1)).replace(hour=17, minute=0, second=0, microsecond=0)
-    
+        # end_time is not used in generation, just for reference to show the real planning horizon
+        # since there are some random begin time between start and end time
+        # but I don't know how to do that without .randint()
+        # Ex. req_time = start_time + timedelta(minutes=random.randint(0, time_window_total_hours * 60 - 2))
+        end_time = start_time + timedelta(hours=time_window_total_hours)
+        print(f"⏰ Real planning horizon in hours: start_time={start_time}, end_time={end_time}")
     
     
     if start_time is None:
@@ -805,14 +810,22 @@ def generate_scenario(
 
     print(f"🍂 Auto season={season} (month={month}): 30% bias toward {bias_direction}")'''
 
+    if Real_planning_horizon_hours:
+        time_window_days = int((time_window_total_hours - 15) / 24)
+    else:
+        time_window_days = int(time_window_total_hours / 24)
 
     # === numerical setting ===
     tail_scale_map = {"low": 400, "high": 600}
     num_tails = tail_scale_map[tail_scale]
-    num_requests = int(num_tails * (0.9 if arrival_rate == "low" else 1.2) * time_window_days)
+    num_requests = int(num_tails * 
+                       (0.9 if arrival_rate == "low" else 1.2) * 
+                       time_window_days)   # scale with tail number and time window, adjust by arrival_rate
     
     mx_scale_map = {"low": 0.1, "high": 0.2}
-    mx_num = mx_scale_map[maintenance_scale] * num_tails * time_window_days
+    mx_num = int(mx_scale_map[maintenance_scale] * 
+              num_tails * 
+              time_window_days)   # scale with tail number and time window, adjust by maintenance_scale
 
     # ====== Vivian ======
     mx_airport = []
@@ -912,7 +925,7 @@ def generate_scenario(
     legs = []
     if crew_included:
         num_crewmembers = num_tails * {"low": 2.2, "high": 2.8}[crewmember_level]
-        crews = generate_crewmembers(num_crewmembers, allowed_tailtypes, real_route_level, airports, start_time, time_window_days)
+        crews = generate_crewmembers(num_crewmembers, allowed_tailtypes, real_route_level, airports, start_time, time_window_total_hours)
         crewmember_count = len(crews)
         crew_activities, crew_fly_together = generate_crew_activities(crews, airports, airport_coords, start_time, legs, tails)
 
@@ -1042,7 +1055,7 @@ def generate_scenario(
 
         arr = random.choice(candidate_pool)'''
 
-        req_time = start_time + timedelta(minutes=random.randint(0, time_window_days * 24 * 60 - 2))
+        req_time = start_time + timedelta(minutes=random.randint(0, time_window_total_hours * 60 - 2))
         req_id = flightID_start + rid
         jet_type = random.choice(allowed_tailtypes)["AircraftTypeName"]
 
@@ -1090,7 +1103,7 @@ def generate_scenario(
         if round_trip_ratio > 0 and random.random() < round_trip_ratio:
             # generate a return request with same dep/arr reversed, same jet type, within the time window
             return_req_time = req_time + timedelta(hours=random.randint(1, 6))
-            if return_req_time < start_time + timedelta(days=time_window_days):
+            if return_req_time < start_time + timedelta(hours=time_window_total_hours):
                 rid += 1
                 return_req_id = flightID_start + rid
                 return_req = {
@@ -1112,7 +1125,7 @@ def generate_scenario(
     for mx_id in range(int(mx_num)):
         dep = random.choice(mx_airport)
         arr = dep
-        req_time = start_time + timedelta(minutes=random.randint(0, time_window_days * 24 * 60 - 2))
+        req_time = start_time + timedelta(minutes=random.randint(0, time_window_total_hours * 60 - 2))
         service_time = random.randint(4, 24)*60  # maintenance time between 4 hours to 24 hours
         req_id = mxID_start + mx_id
         required_tail_obj = random.choice(tails)
@@ -1159,7 +1172,7 @@ def generate_scenario(
             for j in range(extra_request_per_airport):
                 dep = ea
                 arr = random.choice([a for a in airports if a != dep])
-                req_time = start_time + timedelta(minutes=random.randint(0, time_window_days * 24 * 60 - 2))
+                req_time = start_time + timedelta(minutes=random.randint(0, time_window_total_hours * 60 - 2))
                 req_id = flightID_start + len(requests)
                 jet_type = random.choice(allowed_tailtypes)["AircraftTypeName"]
 
@@ -1196,7 +1209,7 @@ def generate_scenario(
             tails=tails,
             affected_airports=weather_affected_airports,
             start_time_dt=start_time,
-            time_window_days=time_window_days,
+            time_window_total_hours=time_window_total_hours,
             starting_leg_id=starting_leg_id
         )
 
@@ -1253,8 +1266,8 @@ def generate_scenario(
         "CrewFlyingTogether": crew_fly_together if crew_included else [],
         "Configuration": {
             "PlanningHorizon": {
-                "BeginTime": (start_time + timedelta(days=-1)).strftime("%Y-%m-%dT%H:%M:%SZ"),  # positioning start 1 day before
-                "EndTime": (start_time + timedelta(days=time_window_days)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "BeginTime": (start_time).strftime("%Y-%m-%dT%H:%M:%SZ"),  # positioning start 1 day before
+                "EndTime": (start_time + timedelta(minutes=time_window_total_hours*24-1)).strftime("%Y-%m-%dT%H:%M:%SZ"),
             }
         },
         # ====================== Bruce ======================
@@ -1270,7 +1283,8 @@ def generate_scenario(
             "maintenance_scale": maintenance_scale,
             "maintenance_airport_distribution": maintenance_airport_distribution,
             # "geo_density": geo_density,
-            "time_window_days": time_window_days,
+            # "time_window_days": time_window_days,
+            "time_window_total_hours": time_window_total_hours,
             "weather": weather,
             "event": event,
             "maintenance_cycle": maintenance_cycle,
