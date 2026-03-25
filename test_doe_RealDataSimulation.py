@@ -235,6 +235,17 @@ def haversine(lat1, lon1, lat2, lon2):
     return R * 2 * atan2(sqrt(a), sqrt(1 - a))
 
 
+# searched the minimum speed is around 500mph 
+def estimate_flight_duration(dep_icao, arr_icao, airport_coords, speed_mph=500):
+    dep_lat, dep_lon = airport_coords[dep_icao]
+    arr_lat, arr_lon = airport_coords[arr_icao]
+    distance = haversine(dep_lat, dep_lon, arr_lat, arr_lon)
+    duration_hours = distance / speed_mph
+
+    # add a take off/landing buffer time of 60 minutes
+    return int(duration_hours * 60 + 60)  # return duration in minutes
+
+
 def airports_inside_circle(epicenter_icao: str, radius_miles: float,
                                       airport_coords: dict) -> set:
     """retrun epicenter radius radius_miles all affected airports in ICAO set。"""
@@ -728,7 +739,7 @@ def generate_scenario(
     # geo_density="low",
     real_route_level="high",     # low: random route; high: weighted route based on real data # controdict with geo_density
     round_trip_ratio=0.2,          # only for real_route_level = high, % of routes that are round trip
-    Real_planning_horizon_hours = False,
+    Real_planning_horizon_hours = True,
     # time_window_days=1,
     time_window_total_hours = 39,
     weather=False,
@@ -1102,8 +1113,14 @@ def generate_scenario(
 
         if round_trip_ratio > 0 and random.random() < round_trip_ratio:
             # generate a return request with same dep/arr reversed, same jet type, within the time window
-            return_req_time = req_time + timedelta(hours=random.randint(1, 6))
-            if return_req_time < start_time + timedelta(hours=time_window_total_hours):
+            # but first calculate the distance/time between dep and arr, and make sure the return request 
+            # is scheduled after the arrival of the first request + a minimum turnaround time (e.g., 1 hour)
+
+            duration_minutes = estimate_flight_duration(dep, arr, airport_coords)
+            turnaround_time = timedelta(hours=1)
+
+            return_req_time = req_time + timedelta(minutes=duration_minutes) + turnaround_time
+            if return_req_time < start_time + timedelta(minutes=time_window_total_hours * 60 - 2):
                 rid += 1
                 return_req_id = flightID_start + rid
                 return_req = {
@@ -1309,7 +1326,7 @@ def generate_scenario(
     }
 
     # filename = f"scenario_{arrival_rate}_{geo_density}_{tail_scale}_{maintenance_cycle}.json"
-    filename = f"./TestCases/DOE_RealDataSimulation_0to0/DOE_run{exp_id}.json"
+    filename = f"./TestCases/DOE_RealDataSimulation/DOE_run{exp_id}.json"
     with open(filename, "w") as f:
         json.dump(scenario, f, indent=2)
     print()
@@ -1482,7 +1499,9 @@ for idx, exp in enumerate(experiments):
                       weather=weather_options[exp[7]],
                       event=event_options[exp[8]],
                       maintenance_cycle=maintenance_cycles[exp[9]],
-                      exp_id=idx+1
+                      exp_id=idx+1,
+                      Real_planning_horizon_hours=True,
+                      time_window_total_hours=39
                       )
     # generate_scenario(**exp)
     print("--------------------------------------------------")
