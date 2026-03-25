@@ -6,8 +6,13 @@ FILES = [
 #    "schedule_sanitized.json",
 #    "formatted_021626.json",
     # "formatted_021826.json"
-    "./RealData/schedule_LikeOrUpgrade02-18-2026Input.json",
+    # "./RealData/schedule_LikeOrUpgrade02-18-2026Input.json",
+    "./RealData/schedule_LikeOrUpgrade02-16-2026Input.json",
 ]
+
+# output_file = "./RealData/OD_total_0218_undirected.csv"
+output_file = "./RealData/OD_total_0216_undirected.csv"
+
 
 TIME_COL = "RequestedTime"
 DEP_COL = "DepartureAirport"
@@ -114,7 +119,7 @@ plt.show()
 # =========================
 # 6) Export to CSV
 # =========================
-output_file = "OD_total_0218_undirected.csv"
+
 
 od_total.to_csv(output_file, index=False, encoding="utf-8")
 
