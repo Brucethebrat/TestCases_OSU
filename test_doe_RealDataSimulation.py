@@ -101,13 +101,15 @@ weighted_airport_TailCrew_csv_path = Path(__file__).resolve().parent / "RealData
 
 
 
-def load_weighted_airport_for_Tail_Crew(csv_path: Path):
+def load_weighted_airport_for_Tail_Crew(csv_path: Path, airports):
     weighted_airports_for_tail = set()
     weighted_airports_for_crew = set()
     # with csv_path.open("r", encoding="utf-8", newline="") as f:
     #     reader = csv.DictReader(f)
     ap_df = pd.read_csv(csv_path)
     for _, row in ap_df.iterrows():
+        if row["airport_name"] not in airports:
+            continue
         airport = row["airport_name"].strip()
         tail_count = int(row["tails_num"])
         crew_count = int(row["crewmembers_num"])
@@ -124,13 +126,15 @@ def load_weighted_airport_for_Tail_Crew(csv_path: Path):
     return weighted_airports_for_tail, weighted_airports_for_crew   # return 2 same sets for now, can be different later if we want different distribution for tail and crew
 
 
-def load_weighted_airport_routes(csv_path: Path):
+def load_weighted_airport_routes(csv_path: Path, airports):
     routes = []
     
     # with csv_path.open("r", encoding="utf-8", newline="") as f:
     #     reader = csv.DictReader(f)
     ap_df = pd.read_csv(csv_path)
     for _, row in ap_df.iterrows():
+        if row["Airport1"] not in airports or row["Airport2"] not in airports:
+            continue
         airport1 = row["Airport1"].strip()
         airport2 = row["Airport2"].strip()
         count = int(row["TotalReservations"])
@@ -154,9 +158,9 @@ def load_weighted_airport_routes(csv_path: Path):
     return routes
 
 
-weighted_airport_routes = load_weighted_airport_routes(weighted_routes_csv_path)
+# weighted_airport_routes = load_weighted_airport_routes(weighted_routes_csv_path)
 
-weighted_airports_for_tail, weighted_airports_for_crew = load_weighted_airport_for_Tail_Crew(weighted_airport_TailCrew_csv_path)
+# weighted_airports_for_tail, weighted_airports_for_crew = load_weighted_airport_for_Tail_Crew(weighted_airport_TailCrew_csv_path)
 
 
 
@@ -339,7 +343,7 @@ def generate_allowed_tailtypes_FA(allowed_tailtypes):
     return rand_allowed_tailtypes
 
 # ====================== Bruce ======================
-def generate_crewmembers(num_crews, allowed_tailtypes, real_route_level, airports, start_time, time_window_total_hours):
+def generate_crewmembers(num_crews, allowed_tailtypes, real_route_level, airports, start_time, time_window_total_hours, weighted_airports_for_crew):
     num_crews = int(num_crews)
     crews = []
     '''positions = ["PIC", "SIC"]
@@ -425,7 +429,7 @@ def pair_2_members_with_rev_flight(crew1, crew2, rev_start_time, airport_coords,
     LegID = legID_start + len(legs) + 1
 
 
-    tails.append({
+    '''tails.append({
         "TailNumber": tailID,
         "AircraftTypeName": chosen_type,
         "AvailableTime": tail_avai_time,        # modify to random, or make it difficult to schedule
@@ -460,16 +464,17 @@ def pair_2_members_with_rev_flight(crew1, crew2, rev_start_time, airport_coords,
                 "CrewmemberPosition": "SIC"
             }
         ]
-    })
+    })'''
 
     # crew1 Rev Flight
     crew_activities.append({
         "CrewmemberID": crew1_id,
         "ActivityType": activity_type,
-        "TailNumber": tailID,
+        # "TailNumber": tailID,
         "CrewmemberPosition": "PIC",
         "IsLocked": False,
-        "LegID": LegID,
+        # "LegID": LegID,
+        "LegID": 0,
         "OriginAirport": dep_airport,
         "DestinationAirport": arr_airport,
         "StartTime": activity_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -479,10 +484,11 @@ def pair_2_members_with_rev_flight(crew1, crew2, rev_start_time, airport_coords,
     crew_activities.append({
         "CrewmemberID": crew2_id,
         "ActivityType": activity_type,
-        "TailNumber": tailID,
+        # "TailNumber": tailID,
         "CrewmemberPosition": "SIC",
         "IsLocked": False,
-        "LegID": LegID,
+        # "LegID": LegID,
+        "LegID": 0,
         "OriginAirport": dep_airport,
         "DestinationAirport": arr_airport,
         "StartTime": activity_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -875,6 +881,11 @@ def generate_scenario(
     else:
         raise ValueError(f"Invalid maintenance_airport_distribution: {maintenance_airport_distribution}")   
     
+    weighted_airport_routes = load_weighted_airport_routes(weighted_routes_csv_path, airports)
+
+    weighted_airports_for_tail, weighted_airports_for_crew = load_weighted_airport_for_Tail_Crew(weighted_airport_TailCrew_csv_path, airports)
+    
+    
     # mx_airport_map = {"low": 20, "mid": 50, "high": 100}
     # mx_airport_num = mx_airport_map[maintenance_airport_number]
     # mx_airport = []
@@ -936,7 +947,7 @@ def generate_scenario(
     legs = []
     if crew_included:
         num_crewmembers = num_tails * {"low": 2.2, "high": 2.8}[crewmember_level]
-        crews = generate_crewmembers(num_crewmembers, allowed_tailtypes, real_route_level, airports, start_time, time_window_total_hours)
+        crews = generate_crewmembers(num_crewmembers, allowed_tailtypes, real_route_level, airports, start_time, time_window_total_hours, weighted_airports_for_crew)
         crewmember_count = len(crews)
         crew_activities, crew_fly_together = generate_crew_activities(crews, airports, airport_coords, start_time, legs, tails)
 
@@ -944,9 +955,13 @@ def generate_scenario(
 
 
 
+
+
     # === generate tails ===
     # tails is defined 
+    general_tail_count = 0
     for i in range(len(tails), num_tails):
+        general_tail_count += 1
         chosen_type = random.choice(allowed_tailtypes)["AircraftTypeName"]
         tail_number = str(tailID_start + i)
 
@@ -982,6 +997,8 @@ def generate_scenario(
             # "lavSeats": random.choice([0, 1]),
         })
 
+
+    print(f"✈️ Generated {len(tails)} tails (including {general_tail_count} general tails and {len(legs)} tails from crew activities).")
 
 
 
@@ -1043,6 +1060,7 @@ def generate_scenario(
         rid += 1
         # else:
         # Random region (low density or 10% random in high density)
+        # weighted_airport_routes = load_weighted_airport_routes(weighted_routes_csv_path, airports)
         if real_route_level == "high" and rid < adjustable_num_requests * REAL_ROUTE_PERCENTAGE:
             arr, dep = pick_2_random_airports_for_req(airports, airports, weighted_airport_routes, use_real_route=True)
         elif real_route_level == "low":
@@ -1284,7 +1302,7 @@ def generate_scenario(
         "Configuration": {
             "PlanningHorizon": {
                 "BeginTime": (start_time).strftime("%Y-%m-%dT%H:%M:%SZ"),  # positioning start 1 day before
-                "EndTime": (start_time + timedelta(minutes=time_window_total_hours*24-1)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "EndTime": (start_time + timedelta(minutes=time_window_total_hours*60-1)).strftime("%Y-%m-%dT%H:%M:%SZ"),
             }
         },
         # ====================== Bruce ======================
@@ -1496,8 +1514,8 @@ for idx, exp in enumerate(experiments):
                     #   real_route_level=real_route_levels[exp[5]],
                       hub_pattern=hub_patterns[exp[6]],
                     #   time_window_days=time_window_days_options[exp[7]],
-                      weather=weather_options[exp[7]],
-                      event=event_options[exp[8]],
+                    #   weather=weather_options[exp[7]],
+                    #   event=event_options[exp[8]],
                       maintenance_cycle=maintenance_cycles[exp[9]],
                       exp_id=idx+1,
                       Real_planning_horizon_hours=True,
