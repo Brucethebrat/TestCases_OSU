@@ -138,9 +138,8 @@ def load_weighted_hourly_reservation(csv_path: Path):
         hour = row["Hour"]
         count = int(row["ReservationCount"])
         
-        hour_str = hour.strftime("%Y-%m-%dT%H:%M:%SZ")
-        # maybe better for dictionary key to be string
-        weighted_reservation_time[hour] = count
+        hour_str = datetime.strptime(hour, "%Y-%m-%d %H:%M:%S%z").strftime("%Y-%m-%dT%H:%M:%SZ")  # convert to ISO format string
+        weighted_reservation_time[hour_str] = count
 
     # print(f"[+] Loaded weighted reservation time from {csv_path.name}.")
     # print(f"first 5 hours: {list(weighted_reservation_time.items())[:5]}")
@@ -238,7 +237,8 @@ def pick_weighted_random_time(start_time, time_window_total_hours, weighted_hour
     eligible_weights = []
 
     for hour, count in weighted_hourly_request.items():
-        hour_dt = datetime.strptime(hour, "%Y-%m-%dT%H:%M:%SZ")
+        # convert back to datetime, but it's already in UTC time, so we can compare directly with start_time which is also in UTC time
+        hour_dt = datetime.strptime(hour, "%Y-%m-%dT%H:%M:%SZ") 
         if start_time <= hour_dt < start_time + timedelta(hours=time_window_total_hours):
             eligible_hours.append(hour_dt)
             eligible_weights.append(count)

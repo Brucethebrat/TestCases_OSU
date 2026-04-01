@@ -8,6 +8,7 @@ from pathlib import Path
 # Config
 # =========================
 # INPUT_FILE = "TestCases/DOE_RealDataSimulation_0to0/DOE_run8.json"
+
 # OUTPUT_CSV = "airport_supply_demand_DOE_run.csv"
 
 
@@ -39,7 +40,6 @@ def parse_dt_utc(s: str):
 
 
 # input can be a Path or already loaded dict
-# OUTPUT_FOLDER is the TestCases folder
 def export_airport_supply_demand(input_data, OUTPUT_FOLDER=None, run_id=None):
     if input_data.is_file():
         INPUT_ENCODING = "utf-8"
@@ -174,25 +174,21 @@ def plot_airport_supply_demand(df):
 # =========================
 if __name__ == "__main__":
     
-    INPUT_FILE = "TestCases/DOE_RealDataSimulation/DOE_run8.json"
-    OUTPUT_CSV = "airport_supply_demand_DOE_run.csv"
-
-
-    INPUT_FOLDER = "TestCases/DOE_RealDataSimulation"
+    INPUT_FOLDER = "TestCases/DOE_RealDataSimulation_0to0"
     # OUTPUTFOLDER is intput folder add "airport_supply_demands"
     OUTPUT_FOLDER = f"{INPUT_FOLDER}/airport_supply_demands"
     Path(OUTPUT_FOLDER).mkdir(exist_ok=True)
 
-    # plot_airport_supply_demand(pd.read_csv("RealData/airport_supply_demand_0216.csv"))
-    # plot_airport_supply_demand(pd.read_csv("RealData/airport_supply_demand_0218.csv"))
+    plot_airport_supply_demand(pd.read_csv("RealData/airport_supply_demand_0216.csv"))
+    plot_airport_supply_demand(pd.read_csv("RealData/airport_supply_demand_0218.csv"))
 
-    count = 0
-    for filename in Path(INPUT_FOLDER).glob("*.json"):
-        run_id = filename.stem.split("run")[-1]
-        export_airport_supply_demand(filename, OUTPUT_FOLDER=OUTPUT_FOLDER, run_id=run_id)
-        plot_airport_supply_demand(pd.read_csv(f"{OUTPUT_FOLDER}/airport_supply_demand_DOE_run{run_id}.csv"))
+    # count = 0
+    # for filename in Path(INPUT_FOLDER).glob("*.json"):
+    #     run_id = filename.stem.split("run")[-1]
+    #     # export_airport_supply_demand(filename, OUTPUT_FOLDER=INPUT_FOLDER, run_id=run_id)
+    #     plot_airport_supply_demand(pd.read_csv(f"{OUTPUT_FOLDER}/airport_supply_demand_DOE_run{run_id}.csv"))
         
-        count += 1
+    #     count += 1
 
-        if count >= 5:  # limit to first 5 files for quick testing
-            break
+    #     if count >= 5:  # limit to first 5 files for quick testing
+    #         break
