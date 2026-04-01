@@ -97,6 +97,7 @@ legID_start = 2000000
 
 
 weighted_routes_csv_path = Path(__file__).resolve().parent / "RealData" / "OD_total_0218_undirected.csv"
+weighted_hourly_reservation_csv_path = Path(__file__).resolve().parent / "RealData" / "hourly_reservation_counts_021826.csv"
 weighted_airport_TailCrew_csv_path = Path(__file__).resolve().parent / "RealData" / "airport_supply_demand_0218.csv"
 
 
@@ -124,6 +125,26 @@ def load_weighted_airport_for_Tail_Crew(csv_path: Path, airports):
     # print(f"[+] First 5 weighted airports for crew: {list(weighted_airports_for_crew)[:5]}")
     # sys.exit()
     return weighted_airports_for_tail, weighted_airports_for_crew   # return 2 same sets for now, can be different later if we want different distribution for tail and crew
+
+
+def load_weighted_hourly_reservation(csv_path: Path):
+    weighted_reservation_time = {}
+    # with csv_path.open("r", encoding="utf-8", newline="") as f:
+    #     reader = csv.DictReader(f)
+    res_time_df = pd.read_csv(csv_path)
+    for _, row in res_time_df.iterrows():
+        # Hour : 2026-02-17 17:00:00+00:00
+        # ReservationCount : 123
+        hour = row["Hour"]
+        count = int(row["ReservationCount"])
+        
+        hour_str = datetime.strptime(hour, "%Y-%m-%d %H:%M:%S%z").strftime("%Y-%m-%dT%H:%M:%SZ")  # convert to ISO format string
+        weighted_reservation_time[hour_str] = count
+
+    # print(f"[+] Loaded weighted reservation time from {csv_path.name}.")
+    # print(f"first 5 hours: {list(weighted_reservation_time.items())[:5]}")
+    # sys.exit()
+    return weighted_reservation_time
 
 
 def load_weighted_airport_routes(csv_path: Path, airports):
@@ -209,6 +230,25 @@ def pick_2_random_airports_for_req(pool1, pool2, weighted_airport_routes=[], use
         while arr == dep:
             arr = random.choice(pool2)
     return dep, arr
+
+
+def pick_weighted_random_time(start_time, time_window_total_hours, weighted_hourly_request):
+    eligible_hours = []
+    eligible_weights = []
+
+    for hour, count in weighted_hourly_request.items():
+        # convert back to datetime, but it's already in UTC time, so we can compare directly with start_time which is also in UTC time
+        hour_dt = datetime.strptime(hour, "%Y-%m-%dT%H:%M:%SZ") 
+        if start_time <= hour_dt < start_time + timedelta(hours=time_window_total_hours):
+            eligible_hours.append(hour_dt)
+            eligible_weights.append(count)
+
+    if eligible_hours:
+        return (random.choices(eligible_hours, weights=eligible_weights, k=1)[0] +
+                 timedelta(minutes=random.randint(0, 59)))  # add random minutes within the hour
+    else:
+        # fallback to uniform random time if no eligible hours
+        return start_time + timedelta(minutes=random.randint(0, time_window_total_hours * 60 - 2))
 
 
 def pick_weighted_random_airport(pool, weighted_airports):
@@ -883,6 +923,8 @@ def generate_scenario(
     
     weighted_airport_routes = load_weighted_airport_routes(weighted_routes_csv_path, airports)
 
+    weighted_hourly_request = load_weighted_hourly_reservation(weighted_hourly_reservation_csv_path)
+
     weighted_airports_for_tail, weighted_airports_for_crew = load_weighted_airport_for_Tail_Crew(weighted_airport_TailCrew_csv_path, airports)
     
     
@@ -1084,7 +1126,8 @@ def generate_scenario(
 
         arr = random.choice(candidate_pool)'''
 
-        req_time = start_time + timedelta(minutes=random.randint(0, time_window_total_hours * 60 - 2))
+        # req_time = start_time + timedelta(minutes=random.randint(0, time_window_total_hours * 60 - 2))
+        req_time = pick_weighted_random_time(start_time, time_window_total_hours, weighted_hourly_request)
         req_id = flightID_start + rid
         jet_type = random.choice(allowed_tailtypes)["AircraftTypeName"]
 
