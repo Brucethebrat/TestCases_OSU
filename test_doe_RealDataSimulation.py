@@ -873,10 +873,10 @@ def generate_scenario(
         time_window_days = int(time_window_total_hours / 24)
 
     # === numerical setting ===
-    tail_scale_map = {"low": 400, "high": 600}
+    tail_scale_map = {"low": 700, "high": 850}
     num_tails = tail_scale_map[tail_scale]
     num_requests = int(num_tails * 
-                       (0.9 if arrival_rate == "low" else 1.2) * 
+                       (0.75 if arrival_rate == "low" else 0.85) * 
                        time_window_days)   # scale with tail number and time window, adjust by arrival_rate
     
     mx_scale_map = {"low": 0.1, "high": 0.2}
@@ -988,7 +988,7 @@ def generate_scenario(
     tails = []
     legs = []
     if crew_included:
-        num_crewmembers = num_tails * {"low": 2.2, "high": 2.8}[crewmember_level]
+        num_crewmembers = num_tails * {"low": 3.3, "high": 3.8}[crewmember_level]
         crews = generate_crewmembers(num_crewmembers, allowed_tailtypes, real_route_level, airports, start_time, time_window_total_hours, weighted_airports_for_crew)
         crewmember_count = len(crews)
         crew_activities, crew_fly_together = generate_crew_activities(crews, airports, airport_coords, start_time, legs, tails)
