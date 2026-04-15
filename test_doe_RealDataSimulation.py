@@ -443,11 +443,11 @@ def generate_crewmembers(num_crews, allowed_tailtypes, real_route_level, airport
     return crews
 
 
-def pair_2_members_with_rev_flight(crew1, crew2, rev_start_time, airport_coords, crew_activities, legs, tails):
+def pair_2_members_with_activity(crew1, crew2, activity_start, airport_coords, activity_type, crew_activities, legs, tails):
     crew1_id = crew1["CrewmemberID"]
     crew2_id = crew2["CrewmemberID"]
             
-    activity_type = "OPERATE_REVENUE_FLIGHT"
+    
     arr_airport = crew1["CurrentLocation"]
     # ===== find a departure airport within 100 miles =====
     radius_miles = 100.0
@@ -458,83 +458,114 @@ def pair_2_members_with_rev_flight(crew1, crew2, rev_start_time, airport_coords,
             break
     # ===== ========================================= =====
 
-    activity_start = rev_start_time
-
-    # Tail attributes
-    tailID = str(tailID_start + len(tails) + 1)
-    chosen_type = random.choice(crew1["CrewmemberQualifications"])["AircraftTypeName"]
-    tail_avai_time = (activity_start - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")  # available 1 day before activity start
-
-    # Leg attributes
-    LegID = legID_start + len(legs) + 1
+    
 
 
-    '''tails.append({
-        "TailNumber": tailID,
-        "AircraftTypeName": chosen_type,
-        "AvailableTime": tail_avai_time,        # modify to random, or make it difficult to schedule
-        "CurrentLocation": arr_airport,
-        "AssignedProperties": [
-            tailID, chosen_type
-            # str(1000000 + i), chosen_type, "ELT_406MHZ_FLAG", "TCAS7.1", "NO_DOUBLE_BUNK"
-        ],
-        "MinutesLeftForNextMaintenance": random.randint(*min_left_range),
-        "CyclesLeftForNextMaintenance": random.randint(*cycle_left_range),
-        "TailCost": 6304,
-        "TailLegCost": 1173
-    })
+    if activity_type == "OPERATE_REVENUE_FLIGHT":
+        
+        # Tail attributes
+        tailID = str(tailID_start + len(tails) + 1)
+        chosen_type = random.choice(crew1["CrewmemberQualifications"])["AircraftTypeName"]
+        tail_avai_time = (activity_start - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")  # available 1 day before activity start
 
-    legs.append({
-        "ActivityType": activity_type,
-        "TailNumber": tailID,
-        "LegID": LegID,
-        "RequestID": 0,
-        "IsLocked": False,
-        "OriginAirport": dep_airport,
-        "DestinationAirport": arr_airport,
-        "StartTime": activity_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "Duration": 120,  # assume 2 hours flight
-        "AssignedCrewmembers": [
-            {
-                "CrewmemberID": crew1_id,
-                "CrewmemberPosition": "PIC"
-            },
-            {
-                "CrewmemberID": crew2_id,
-                "CrewmemberPosition": "SIC"
-            }
-        ]
-    })'''
+        # Leg attributes
+        LegID = legID_start + len(legs) + 1
 
-    # crew1 Rev Flight
-    crew_activities.append({
-        "CrewmemberID": crew1_id,
-        "ActivityType": activity_type,
-        # "TailNumber": tailID,
-        "CrewmemberPosition": "PIC",
-        "IsLocked": False,
-        # "LegID": LegID,
-        "LegID": 0,
-        "OriginAirport": dep_airport,
-        "DestinationAirport": arr_airport,
-        "StartTime": activity_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "Duration": 120
-    })
-    # crew2 Rev Flight
-    crew_activities.append({
-        "CrewmemberID": crew2_id,
-        "ActivityType": activity_type,
-        # "TailNumber": tailID,
-        "CrewmemberPosition": "SIC",
-        "IsLocked": False,
-        # "LegID": LegID,
-        "LegID": 0,
-        "OriginAirport": dep_airport,
-        "DestinationAirport": arr_airport,
-        "StartTime": activity_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "Duration": 120
-    })
 
+        tails.append({
+            "TailNumber": tailID,
+            "AircraftTypeName": chosen_type,
+            "AvailableTime": tail_avai_time,        # modify to random, or make it difficult to schedule
+            "CurrentLocation": arr_airport,
+            "AssignedProperties": [
+                tailID, chosen_type
+                # str(1000000 + i), chosen_type, "ELT_406MHZ_FLAG", "TCAS7.1", "NO_DOUBLE_BUNK"
+            ],
+            "MinutesLeftForNextMaintenance": random.randint(*min_left_range),
+            "CyclesLeftForNextMaintenance": random.randint(*cycle_left_range),
+            "TailCost": 6304,
+            "TailLegCost": 1173
+        })
+
+        legs.append({
+            "ActivityType": activity_type,
+            "TailNumber": tailID,
+            "LegID": LegID,
+            "RequestID": 0,
+            "IsLocked": True,
+            "OriginAirport": dep_airport,
+            "DestinationAirport": arr_airport,
+            "StartTime": activity_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "Duration": 120,  # assume 2 hours flight
+            "AssignedCrewmembers": [
+                {
+                    "CrewmemberID": crew1_id,
+                    "CrewmemberPosition": "PIC"
+                },
+                {
+                    "CrewmemberID": crew2_id,
+                    "CrewmemberPosition": "SIC"
+                }
+            ]
+        })
+
+        # crew1 Rev Flight
+        crew_activities.append({
+            "CrewmemberID": crew1_id,
+            "ActivityType": activity_type,
+            "TailNumber": tailID,
+            "CrewmemberPosition": "PIC",
+            "IsLocked": True,
+            "LegID": LegID,
+            "LegID": 0,
+            "OriginAirport": dep_airport,
+            "DestinationAirport": arr_airport,
+            "StartTime": activity_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "Duration": 120
+        })
+        # crew2 Rev Flight
+        crew_activities.append({
+            "CrewmemberID": crew2_id,
+            "ActivityType": activity_type,
+            "TailNumber": tailID,
+            "CrewmemberPosition": "SIC",
+            "IsLocked": True,
+            "LegID": LegID,
+            "LegID": 0,
+            "OriginAirport": dep_airport,
+            "DestinationAirport": arr_airport,
+            "StartTime": activity_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "Duration": 120
+        })
+
+    elif activity_type == "MOVEMENT":
+        # crew1 Movement
+        crew_activities.append({
+            "CrewmemberID": crew1_id,
+            "ActivityType": activity_type,
+            "IsLocked": True,
+            "LegID": 0,
+            "OriginAirport": dep_airport,
+            "DestinationAirport": arr_airport,
+            "StartTime": activity_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "Duration": 120   # assume 2 hour movement
+        })
+        # crew2 Movement
+        crew_activities.append({
+            "CrewmemberID": crew2_id,
+            "ActivityType": activity_type,
+            "IsLocked": True,
+            "LegID": 0,
+            "OriginAirport": dep_airport,
+            "DestinationAirport": arr_airport,
+            "StartTime": activity_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "Duration": 120   # assume 2 hour movement
+        })
+
+    else:
+        print(f"Invalid activity type {activity_type} for pairing crew members.")
+        sys.exit()
+    
     # list doesn't have to be returned
     # return legs, tails, crew_activities
 
@@ -549,6 +580,7 @@ def crew_rest(crew, rest_airport, start_rest_time, duty_duration, crew_activitie
     crew_activities.append({
         "CrewmemberID": crew_id,
         "ActivityType": activity_type,
+        "IsLocked": True,
         "OriginAirport": dep_airport,
         "DestinationAirport": arr_airport,
         "StartTime": activity_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -561,16 +593,24 @@ def generate_crew_activities(crews, airports, airport_coords, start_time, legs=[
     crew_fly_together = []
 
 
-    first_half_crews = crews[:len(crews)//2]
-    second_half_crews = crews[len(crews)//2:]
+    ACTIVITY_GENERATE_TAIL_THRESHOLD = 50   # won't generate tails more than this threshold
+                                            # Since revenue activity generates tails, we want to limit the number of tails
+    ONE_NTH = 3
+    ONE_NTH_CREWS = len(crews) // ONE_NTH
+
+    first_group_crews = crews[:ONE_NTH_CREWS]
+    second_group_crews = crews[ONE_NTH_CREWS:]
     
-    # First half crewmem don't have partner during the planning window
-    for crew in first_half_crews:
-        # if random.random() < 0.9:
-        #     continue  # 20% chance to skip adding activities for this crew
+    # First group of crewmem don't have partner during the planning window
+    for crew in first_group_crews:
+        if random.random() < 0.2:
+            continue  # 20% chance to skip adding activities for this crew
 
         tour_start_dt = datetime.strptime(crew["tourStartDate"], "%Y-%m-%dT%H:%M:%SZ")
         # tour_end_dt = datetime.strptime(crew["tourEndDate"], "%Y-%m-%dT%H:%M:%SZ")
+
+        # ps_ts_diff_24 determines when start planning, how many hours have a crew been on duty, 
+        # if over 10~14, then they are resting, otherwise on duty
         ps_ts_diff_24 = (start_time - tour_start_dt) % (24 * timedelta(hours=1))
         duty_duration = random.randint(10,14)  # duty duration in hours
 
@@ -593,22 +633,41 @@ def generate_crew_activities(crews, airports, airport_coords, start_time, legs=[
             dummy_crew_tour_start = (dummy_crew_tour_end - timedelta(days=7, hours=12, minutes=59))
             dummy_arr_airport = crew["CurrentLocation"]
 
-            crews.append({
+            dummy_crew = {
                 "CrewmemberID": dummy_crew_id,
                 "CurrentLocation": dummy_arr_airport,
                 "AirportIDDomicile": random.choice(airports),    # base airport
                 "tourStartDate": dummy_crew_tour_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "tourEndDate": dummy_crew_tour_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "CrewmemberQualifications": qualified_types
-            })
+            }
 
-            dummy_crew = crews[-1]
+            # dummy_crew = crews[-1]
             
-            pair_2_members_with_rev_flight(crew1=crew, crew2=dummy_crew, 
-                                           rev_start_time=start_time - timedelta(hours=2),
-                                           airport_coords=airport_coords,
-                                           crew_activities=crew_activities, 
-                                           legs=legs, tails=tails)
+            rest_airport = crew["CurrentLocation"]
+            start_rest_time = start_time - ps_ts_diff_24 + duty_duration * timedelta(hours=1)
+            crew_rest(crew, rest_airport, start_rest_time, duty_duration, crew_activities)
+
+            if ps_ts_diff_24 <= timedelta(hours=2):
+                continue    # if duty just started within 2 hours before planning window, skip adding activity, 
+                            # as they are unlikely to have a flight before planning window, and we want to keep some buffer time for the first leg
+            
+            # The first activity after rest is between REST end and planning start
+            activity_start = start_time - timedelta(hours=random.choice(range(1,ps_ts_diff_24.seconds//3600-1)))
+            if len(tails) <= ACTIVITY_GENERATE_TAIL_THRESHOLD:
+                pair_2_members_with_activity(crew1=crew, crew2=dummy_crew, 
+                                            activity_start=activity_start,
+                                            airport_coords=airport_coords,
+                                            activity_type="OPERATE_REVENUE_FLIGHT",
+                                            crew_activities=crew_activities, 
+                                            legs=legs, tails=tails)
+            else:
+                pair_2_members_with_activity(crew1=crew, crew2=dummy_crew, 
+                                            activity_start=activity_start,
+                                            airport_coords=airport_coords,
+                                            activity_type="MOVEMENT",
+                                            crew_activities=crew_activities, 
+                                            legs=legs, tails=tails)
             
             '''crew_id = crew["CrewmemberID"]
             
@@ -686,18 +745,20 @@ def generate_crew_activities(crews, airports, airport_coords, start_time, legs=[
             })
             '''
 
-            rest_airport = crew["CurrentLocation"]
-            start_rest_time = start_time - ps_ts_diff_24 + duty_duration * timedelta(hours=1)
-            crew_rest(crew, rest_airport, start_rest_time, duty_duration, crew_activities)
-
         # Crewmember still RESTING at the beginning of planning window -> "REST" activity
         else:
             rest_airport = crew["CurrentLocation"]
             activity_start = start_time - ps_ts_diff_24 + duty_duration * timedelta(hours=1)
             crew_rest(crew, rest_airport, activity_start, duty_duration, crew_activities)
 
+    # Second group of crew members will be paired together for activities during the planning window
+    # except for those skipped by the 30% chance, they will have no activity like the first group, and no partner to fly with
     get_2_crew_members = False
-    for crew in second_half_crews:
+    for crew in second_group_crews:
+        if random.random() < 0.3:
+            continue  # 30% chance to skip adding activities for this crew
+
+
         # ==== get 2 crewmembers at a time ====
         if not get_2_crew_members:
             crew1 = crew
@@ -723,7 +784,6 @@ def generate_crew_activities(crews, airports, airport_coords, start_time, legs=[
         duty_duration = random.randint(10,14)  # duty duration in hours
 
 
-
         # Crewmember shift starts after "2hrs before planning window" -> no activity
         # keep 2 hrs buffer to put in an leg before planning window
         # !!!!!!!! These 2 mem is not paired together !!!!!!!!
@@ -732,9 +792,7 @@ def generate_crew_activities(crews, airports, airport_coords, start_time, legs=[
         
         # Crewmember duty still ongoing at the beginning of planning window -> "revenue flight" activity
         elif ps_ts_diff_24_1 <= timedelta(hours=duty_duration):
-            rev_start_time = start_time - timedelta(hours=2)
-            pair_2_members_with_rev_flight(crew1, crew2, rev_start_time, airport_coords, crew_activities, legs, tails)
-            
+                
             rest_airport = crew1["CurrentLocation"]
             start_rest_time = start_time - ps_ts_diff_24_1 + duty_duration * timedelta(hours=1)
             crew_rest(crew1, rest_airport, start_rest_time, duty_duration, crew_activities)
@@ -747,24 +805,45 @@ def generate_crew_activities(crews, airports, airport_coords, start_time, legs=[
                 ]
             })
 
-        # Crewmember still RESTING at the beginning of planning window -> "REST" & "revenue flight" that pairs 2 members
+            if ps_ts_diff_24_1 <= timedelta(hours=2):
+                continue    # if duty just started within 2 hours before planning window, skip adding activity, 
+                            # as they are unlikely to have a flight before planning window, and we want to keep some buffer time for the first leg
+
+            # The first activity after rest is between REST end and planning start, random start time for the activity
+            activity_start = start_time - timedelta(hours=random.choice(range(1,ps_ts_diff_24_1.seconds//3600-1)))  # start after 1 hour of rest
+            if len(tails) <= ACTIVITY_GENERATE_TAIL_THRESHOLD:
+                pair_2_members_with_activity(crew1=crew, crew2=crew2, 
+                                            activity_start=activity_start,
+                                            airport_coords=airport_coords,
+                                            activity_type="OPERATE_REVENUE_FLIGHT",
+                                            crew_activities=crew_activities, 
+                                            legs=legs, tails=tails)
+            else:
+                pair_2_members_with_activity(crew1=crew, crew2=dummy_crew, 
+                                                activity_start=activity_start,
+                                                airport_coords=airport_coords,
+                                                activity_type="MOVEMENT",
+                                                crew_activities=crew_activities, 
+                                                legs=legs, tails=tails)
+                
+        # Crewmember still RESTING at the beginning of planning window -> "REST"
         else:
             rest_airport = crew["CurrentLocation"]
             activity_start = start_time - ps_ts_diff_24 + duty_duration * timedelta(hours=1)
             crew_rest(crew1, rest_airport, activity_start, duty_duration, crew_activities)
             crew_rest(crew2, rest_airport, activity_start, duty_duration, crew_activities)
 
-            # assign rev flight to pair 2 members
-            # start 2 hrs b4 "rest" start
-            rev_start_time = activity_start - timedelta(hours=2)
-            pair_2_members_with_rev_flight(crew1, crew2, rev_start_time, airport_coords, crew_activities, legs, tails)
+            # # assign rev flight to pair 2 members
+            # # start 2 hrs b4 "rest" start
+            # rev_start_time = activity_start - timedelta(hours=2)
+            # pair_2_members_with_activity(crew1, crew2, rev_start_time, airport_coords, crew_activities, legs, tails)
 
-            crew_fly_together.append({
-                "Crewmembers": [
-                    crew1["CrewmemberID"],
-                    crew2["CrewmemberID"]
-                ]
-            })
+            # crew_fly_together.append({
+            #     "Crewmembers": [
+            #         crew1["CrewmemberID"],
+            #         crew2["CrewmemberID"]
+            #     ]
+            # })
 
     return crew_activities, crew_fly_together
 
@@ -965,6 +1044,7 @@ def generate_scenario(
         {"AircraftTypeName": "GL6000S", "Penalty": 0},
         {"AircraftTypeName": "GL7500", "Penalty": 0},
         {"AircraftTypeName": "GL5500", "Penalty": 0},
+        {"AircraftTypeName": "CL-3500", "Penalty": 0},
     ]
     
     # === set maintenance parameters based on DOE factor ===
@@ -1333,7 +1413,7 @@ def generate_scenario(
         # always output legs
         "Legs": legs,
         **({"Crewmembers": crews} if crew_included else {}),    # ====================== Bruce ======================
-        **({"CrewActivities": crew_activities} if crew_included else {}),    # ====================== Bruce ======================
+        **({"CrewmemberActivities": crew_activities} if crew_included else {}),    # ====================== Bruce ======================
         "Weather": {
             "Enabled": weather,
             "Epicenter": epicenter if weather else None,
@@ -1387,7 +1467,7 @@ def generate_scenario(
     }
 
     # filename = f"scenario_{arrival_rate}_{geo_density}_{tail_scale}_{maintenance_cycle}.json"
-    filename = f"./TestCases/DOE_RealDataSimulation/DOE_run{exp_id}.json"
+    filename = f"./TestCases/DOE_TestCrewActivity/DOE_run{exp_id}.json"
     with open(filename, "w") as f:
         json.dump(scenario, f, indent=2)
     print()
