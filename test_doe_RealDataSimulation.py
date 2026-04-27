@@ -642,7 +642,7 @@ def generate_crew_activities(crews, airports, airport_coords, start_time, legs=[
                 "CrewmemberQualifications": qualified_types
             }
 
-            # dummy_crew = crews[-1]
+            crews.append(dummy_crew)  # add dummy crew to crews list, so the model can find this crew in the data
             
             rest_airport = crew["CurrentLocation"]
             start_rest_time = start_time - ps_ts_diff_24 + duty_duration * timedelta(hours=1)
@@ -852,6 +852,18 @@ def generate_crew_activities(crews, airports, airport_coords, start_time, legs=[
 
 
 # === DOE factors ===
+
+def load_source_json_auto(path: Path):
+    """Auto-detect encoding (utf-8 / utf-8-sig / utf-16) and load JSON from source real-data file."""
+    for enc in ["utf-8", "utf-8-sig", "utf-16"]:
+        try:
+            with open(path, "r", encoding=enc) as f:
+                return json.load(f)
+        except Exception:
+            continue
+    raise ValueError(f"Cannot read {path} with utf-8 / utf-8-sig / utf-16")
+
+
 def generate_scenario(
     area="US",
     arrival_rate="low",
@@ -874,7 +886,11 @@ def generate_scenario(
     # start_time="2026-02-17T17:00:00Z",
     season="Winter",        # removed for now
     hub_pattern = "fly_out",
-    exp_id=0
+    exp_id=0,
+    # ── : switch to pull real-data attributes from source file ──
+    include_excluded_crew=True,           # True → copy excludedCrew block from source file
+    include_crew_scheduling_prefs=True,   # True → copy CrewSchedulingPreferences into Configuration
+    real_data_source_file=Path(__file__).resolve().parent / "RealData" / "schedule_LikeOrUpgrade02-18-2026Input_pretty.json",
 ):
     if Real_planning_horizon_hours:
         start_time = (datetime.strptime(start_time, "%Y-%m-%dT%H:%M:%SZ") + timedelta(days=-1)).replace(hour=17, minute=0, second=0, microsecond=0)
@@ -952,10 +968,10 @@ def generate_scenario(
         time_window_days = int(time_window_total_hours / 24)
 
     # === numerical setting ===
-    tail_scale_map = {"low": 400, "high": 600}
+    tail_scale_map = {"low": 719, "high": 600}
     num_tails = tail_scale_map[tail_scale]
     num_requests = int(num_tails * 
-                       (0.9 if arrival_rate == "low" else 1.2) * 
+                       (0.85 if arrival_rate == "low" else 1.2) * 
                        time_window_days)   # scale with tail number and time window, adjust by arrival_rate
     
     mx_scale_map = {"low": 0.1, "high": 0.2}
@@ -1068,7 +1084,7 @@ def generate_scenario(
     tails = []
     legs = []
     if crew_included:
-        num_crewmembers = num_tails * {"low": 2.2, "high": 2.8}[crewmember_level]
+        num_crewmembers = num_tails * {"low": 3.3, "high": 2.8}[crewmember_level]
         crews = generate_crewmembers(num_crewmembers, allowed_tailtypes, real_route_level, airports, start_time, time_window_total_hours, weighted_airports_for_crew)
         crewmember_count = len(crews)
         crew_activities, crew_fly_together = generate_crew_activities(crews, airports, airport_coords, start_time, legs, tails)
@@ -1465,6 +1481,38 @@ def generate_scenario(
             "cycles_left_by_type": cycels_left_by_type,
         }
     }
+
+        # ── Vivian: optionally inject real-data attributes from source file ──
+    if include_excluded_crew or include_crew_scheduling_prefs:
+        src_path = Path(real_data_source_file)
+        if not src_path.exists():
+            print(f"⚠️  Source file not found: {src_path} — skipping excludedCrew / CrewSchedulingPreferences injection.")
+        else:
+            src_data = load_source_json_auto(src_path)
+
+            # --- excludedCrew ---
+            if include_excluded_crew:
+                if "excludedCrew" in src_data:
+                    scenario["excludedCrew"] = src_data["excludedCrew"]
+                    print(f"✅ excludedCrew injected ({len(src_data['excludedCrew'])} entries) from {src_path.name}")
+                else:
+                    print(f"⚠️  'excludedCrew' key not found in {src_path.name} — skipped.")
+
+            # --- CrewSchedulingPreferences (inserted right after PlanningHorizon inside Configuration) ---
+            if include_crew_scheduling_prefs:
+                try:
+                    crew_sched_prefs = src_data["Configuration"]["CrewSchedulingPreferences"]
+                    old_config = scenario["Configuration"]
+                    new_config = {}
+                    for k, v in old_config.items():
+                        new_config[k] = v
+                        if k == "PlanningHorizon":
+                            new_config["CrewSchedulingPreferences"] = crew_sched_prefs
+                    scenario["Configuration"] = new_config
+                    print(f"✅ CrewSchedulingPreferences injected ({len(crew_sched_prefs)} entries) from {src_path.name}")
+                except KeyError as e:
+                    print(f"⚠️  Key {e} not found in {src_path.name} — CrewSchedulingPreferences skipped.")
+
 
     # filename = f"scenario_{arrival_rate}_{geo_density}_{tail_scale}_{maintenance_cycle}.json"
     filename = f"./TestCases/DOE_TestCrewActivity/DOE_run{exp_id}.json"
