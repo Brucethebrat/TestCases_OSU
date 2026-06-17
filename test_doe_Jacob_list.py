@@ -102,7 +102,7 @@ tailID_start = 1000000
 legID_start = 2000000
 
 
-weighted_routes_csv_path = Path(__file__).resolve().parent / "RealData" / "OD_total_0218_undirected.csv"
+weighted_routes_csv_path = Path(__file__).resolve().parent / "RealData" / "OD_total_0218_undirected_with_distance.csv"
 weighted_hourly_reservation_csv_path = Path(__file__).resolve().parent / "RealData" / "hourly_reservation_counts_021826.csv"
 weighted_airport_TailCrew_csv_path = Path(__file__).resolve().parent / "RealData" / "airport_supply_demand_0218.csv"
 
@@ -175,7 +175,7 @@ def load_weighted_hourly_reservation(csv_path: Path):
     return pattern_24h
 
 
-def load_weighted_airport_routes(csv_path: Path, primary_airports, international_airports=None):
+def load_weighted_airport_routes(csv_path: Path, primary_airports, international_airports=None, route_distance_level="normal"):
     """
     Load weighted routes and split them into:
     - domestic_routes: both endpoints are in primary_airports (US-US)
@@ -202,8 +202,22 @@ def load_weighted_airport_routes(csv_path: Path, primary_airports, international
             continue
         if a1 == a2:
             continue
-        
-        count = int(row["TotalReservations"])
+
+        if route_distance_level == "low":
+            count = 0
+            if row["Distance"] < 1000:
+                count = int(row["TotalReservations"]) * 2  # upscale short distance routes
+            else:
+                count = int(row["TotalReservations"])
+        elif route_distance_level == "high":
+            count = 0
+            if row["Distance"] >= 1000:
+                count = int(row["TotalReservations"]) * 2  # upscale long distance routes
+            else:
+                count = int(row["TotalReservations"])
+        else:
+            count = int(row["TotalReservations"])
+
         if count <= 1:
             continue
         
@@ -978,6 +992,7 @@ def generate_scenario(
     maintenance_scale="low",
     maintenance_airport_distribution ="east",
     # geo_density="low",
+    route_distance_level="high",   # low / normal / high — controls route distance distribution, low: more short routes, high: more long routes
     real_route_level="high",     # low: random route; high: weighted route based on real data # controdict with geo_density
     round_trip_ratio=0.2,          # only for real_route_level = high, % of routes that are round trip
     Real_planning_horizon_hours = False,
@@ -1130,7 +1145,8 @@ def generate_scenario(
     domestic_routes, international_routes = load_weighted_airport_routes(
         weighted_routes_csv_path,
         primary_airports=airports,
-        international_airports=non_us_airports_in_cache
+        international_airports=non_us_airports_in_cache,
+        route_distance_level=route_distance_level,
     )
     
     # If international flying is enabled, expand the airport pool to include
@@ -1357,9 +1373,15 @@ def generate_scenario(
         # Random region (low density or 10% random in high density)
         # weighted_airport_routes = load_weighted_airport_routes(weighted_routes_csv_path, airports)
         if real_route_level == "high" and rid < adjustable_num_requests * REAL_ROUTE_PERCENTAGE:
-            arr, dep = pick_2_random_airports_for_req(airports, airports, weighted_airport_routes, use_real_route=True)
+            if route_distance_level == "normal":
+                arr, dep = pick_2_random_airports_for_req(airports, airports, weighted_airport_routes, use_real_route=True)
+            elif route_distance_level == "low":
+                arr, dep = pick_2_random_airports_for_req(airports, airports, weighted_airport_routes, use_real_route=True)
+            elif route_distance_level == "high":
+                arr, dep = pick_2_random_airports_for_req(airports, airports, weighted_airport_routes, use_real_route=True)
         elif real_route_level == "low":
             arr, dep = pick_2_random_airports_for_req(airports, airports, use_real_route=False)
+            
 
         '''Season conflict with geo density, skip for now, fix in future version
         # === choose arrival airport with seasonal bias ===
@@ -1504,7 +1526,7 @@ def generate_scenario(
 
         # extra_requests = []
         for ea in event_airports:
-        # each airport generates 10 requests
+        # generates 10% extra requests, split evenly among airports within 100 miles of the event epicenter
             for j in range(extra_request_per_airport):
                 dep = ea
                 arr = random.choice([a for a in airports if a != dep])
@@ -1717,6 +1739,7 @@ crewmember_levels = ["low", "high"] # "mid",
 maintenance_scales = ["low", "high"]
 maintenance_airport_distributions = ["balanced", "east"] # "west",
 # geo_densities = ["low", "high"]
+route_distance_level=["normal", "low", "high"]
 real_route_levels = ["low", "high"]
 hub_patterns = ["fly_out", "fly_in"] # "fly_io",
 time_window_days_options = [1, 3]
@@ -1872,4 +1895,5 @@ for idx, exp in enumerate(experiments):
                       )
     # generate_scenario(**exp)
     print("--------------------------------------------------")
+    sys.exit()
     
