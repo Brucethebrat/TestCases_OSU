@@ -1342,7 +1342,7 @@ def generate_scenario(
 
         # extra_requests = []
         for ea in event_airports:
-        # each airport generates 10 requests
+        # generates 10% extra requests, split evenly among airports within 100 miles of the event epicenter
             for j in range(extra_request_per_airport):
                 dep = ea
                 arr = random.choice([a for a in airports if a != dep])

@@ -17,7 +17,7 @@ def get_airport_pool(schedule_file=schedule_file):
     print("[+] Getting airport pool from schedule file.")
     for file in schedule_file:
         print(f"    - {file}")    
-    ac_type_names = ["CE-680AS", "GL5000S", "CE-700", "CL-650S", "CL-350S", "CE-680", "CE-560XLS", "EMB-505S", "EMB-505E", "EMB-545-MOD", "GL6000S", "GL7500", "GL5500"]
+    ac_type_names = ["CE-680AS", "GL5000S", "CE-700", "CL-650S", "CL-350S", "CE-680", "CE-560XLS", "EMB-505S", "EMB-505E", "EMB-545-MOD", "GL6000S", "GL7500", "GL5500", "CL-3500"]
 
     fleet_seed_airports = set()
 
